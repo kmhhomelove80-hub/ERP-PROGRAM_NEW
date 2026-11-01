@@ -93,6 +93,18 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
                 assert tabs.count()==2
                 for tab in tabs.all():
                     box=tab.bounding_box();assert box['height']>=44 and box['width']>=44
+                # Long ERP codes must be fully readable without ellipsis or overlap.
+                assert phone.locator('.stock-item').first.evaluate("""node => {
+                    const old = node.textContent;
+                    node.textContent = 'ABT06N3PBD000003-EXTRA-LONG-ERP-CODE-1234567890';
+                    const style = getComputedStyle(node);
+                    const next = node.nextElementSibling.getBoundingClientRect();
+                    const rect = node.getBoundingClientRect();
+                    const fits = style.textOverflow !== 'ellipsis' && style.whiteSpace !== 'nowrap'
+                        && node.scrollWidth <= node.clientWidth + 1 && rect.right <= next.left + 1;
+                    node.textContent = old;
+                    return fits;
+                }""")
                 assert phone.locator('.mobile-stock-cards').is_visible()
                 assert not phone.locator('.desktop-stock-table').is_visible()
             phone.set_viewport_size({'width':390,'height':844})
@@ -293,7 +305,7 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
             assert book.active['H2'].value==2
             book.close()
             assert not errors,errors
-            report={'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
+            report={'long_erp_code_no_clipping_320_to_844':True,'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
             (artifacts/'result.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
             print(json.dumps(report,ensure_ascii=False,indent=2))
             browser.close()
