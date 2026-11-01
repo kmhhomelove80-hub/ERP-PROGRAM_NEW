@@ -12,6 +12,8 @@
     const scale = Math.min(1, 1600 / Math.max(width, height));
     canvas.width = Math.max(1, Math.round(width * scale));
     canvas.height = Math.max(1, Math.round(height * scale));
+    context.fillStyle = '#fff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(source, 0, 0, canvas.width, canvas.height);
     const rgba = context.getImageData(0, 0, canvas.width, canvas.height).data;
     const gray = new Uint8ClampedArray(canvas.width * canvas.height);
@@ -29,7 +31,6 @@
     form.elements.q.value = value;
     dialog.close();
     form.requestSubmit();
-    form.elements.q.focus();
     return true;
   }
   photo.addEventListener('change', async () => {
@@ -60,7 +61,12 @@
   document.querySelector('#scan-close').addEventListener('click', () => dialog.close());
   window.addEventListener('pagehide', stop);
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && dialog.open) dialog.close();
+    if (document.hidden && dialog.open) {
+      // A native camera/photo picker can background the browser. Keep the dialog
+      // open so the chosen image can be decoded when the user returns.
+      stop();
+      status.textContent = '실시간 카메라를 중지했습니다. 사진을 선택하거나 닫은 뒤 다시 스캔하세요.';
+    }
   });
   open.addEventListener('click', async () => {
     stop();

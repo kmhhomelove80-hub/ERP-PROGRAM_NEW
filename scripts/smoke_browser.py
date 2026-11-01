@@ -112,16 +112,20 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
                     return fits;
                 }""")
                 assert phone.locator('#stock-filter input').is_visible()
-                for selector in ['#stock-filter select', '#stock-filter button', '.scan-controls', '.stock-overview', '.stock-erp-note']:
+                for selector in ['#stock-filter select', '#stock-filter button:not(#scan-open)', '.stock-overview', '.stock-erp-note']:
                     assert not phone.locator(selector).is_visible(), selector
+                assert phone.locator('#scan-open').is_visible()
+                box=phone.locator('#scan-open').bounding_box();assert box['width']>=44 and box['height']>=44
                 assert phone.locator('.mobile-stock-cards').is_visible()
                 assert not phone.locator('.desktop-stock-table').is_visible()
             phone.set_viewport_size({'width':390,'height':844})
-            # Camera controls remain available on desktop only.
+            # PC has no scan banner/icon; phone has one compact icon beside search.
             phone.set_viewport_size({'width':1200,'height':900})
-            assert phone.locator('.scan-controls').is_visible()
+            assert not phone.locator('#scan-open').is_visible()
+            assert phone.locator('.scan-controls').count()==0
             assert phone.locator('#stock-filter select').is_visible()
             assert phone.locator('.stock-overview').is_visible()
+            phone.set_viewport_size({'width':390,'height':844})
             # Exercise unsupported, denied, and successful camera paths with mocks.
             phone.evaluate("Object.defineProperty(window, 'isSecureContext', {configurable:true, value:false})")
             phone.locator('#scan-open').click()
@@ -150,9 +154,17 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
             }""")
             phone.evaluate("Object.defineProperty(window, 'isSecureContext', {configurable:true, value:false}); window.BarcodeDetector=undefined")
             phone.locator('#scan-open').click()
+            # Native photo capture may hide the browser; keep the dialog for return.
+            phone.evaluate("Object.defineProperty(document,'hidden',{configurable:true,value:true}); document.dispatchEvent(new Event('visibilitychange'))")
+            assert phone.locator('#scan-dialog').evaluate('node=>node.open')
+            phone.evaluate("Object.defineProperty(document,'hidden',{configurable:true,value:false})")
             phone.locator('#scan-photo').set_input_files({'name':'qr.png','mimeType':'image/png','buffer':base64.b64decode(qr)})
             phone.wait_for_function("!document.querySelector('#scan-dialog').open")
             assert phone.get_by_role('textbox',name='재고 검색',exact=True).input_value()=='DEMO-LAMP-001'
+            # Read an actual Code 128 image with the same local photo decoder.
+            phone.locator('#scan-open').click()
+            phone.locator('#scan-photo').set_input_files(str(root/'scripts/fixtures/scan-code128.svg'))
+            phone.wait_for_function("!document.querySelector('#scan-dialog').open && document.querySelector('#stock-filter').elements.q.value==='CODE128-TEST'")
             phone.evaluate("""() => {
                 Object.defineProperty(window, 'isSecureContext', {configurable:true, value:true});
                 window.BarcodeDetector = class {
@@ -423,7 +435,7 @@ print(order.pk)
                 assert pc.locator(f'[name="{name}"]').count()==0
             pc.screenshot(path=str(artifacts/'simple-user-permissions.png'),full_page=True)
             assert not errors,errors
-            report={'desktop_single_line_specifications_with_table_scroll':True,'same_order_80_released_20_supplemented':True,'two_roles_simple_admin_and_reader_no_mutation_controls':True,'mobile_all_headers_toggle_numeric_sort_and_search_preserves_order':True,'ime_search_before_blur_compositionend':True,'phone_search_and_rows_only_desktop_controls_preserved':True,'company_logo_loaded_login_and_header':True,'erp_12_char_symbols_single_line_320_to_844':True,'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
+            report={'actual_code128_photo_local_decoder':True,'phone_scan_icon_desktop_hidden_photo_picker_return':True,'desktop_single_line_specifications_with_table_scroll':True,'same_order_80_released_20_supplemented':True,'two_roles_simple_admin_and_reader_no_mutation_controls':True,'mobile_all_headers_toggle_numeric_sort_and_search_preserves_order':True,'ime_search_before_blur_compositionend':True,'phone_search_and_rows_only_desktop_controls_preserved':True,'company_logo_loaded_login_and_header':True,'erp_12_char_symbols_single_line_320_to_844':True,'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
             (artifacts/'result.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
             print(json.dumps(report,ensure_ascii=False,indent=2))
             browser.close()
