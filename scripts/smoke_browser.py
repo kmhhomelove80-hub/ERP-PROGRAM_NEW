@@ -172,6 +172,21 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
             phone.get_by_role('textbox',name='재고 검색',exact=True).fill('DEMO-LAMP-001')
             phone.wait_for_function("document.querySelector('#stock-search-status').textContent==='조회 완료'")
             phone.set_viewport_size({'width':390,'height':844})
+            # Phone IMEs may not end composition until focus leaves the input.
+            search = phone.get_by_role('textbox',name='재고 검색',exact=True)
+            search.focus()
+            search.dispatch_event('compositionstart', {'data':''})
+            search.evaluate("node => { node.value='없는품목'; node.dispatchEvent(new InputEvent('input',{bubbles:true,isComposing:true,inputType:'insertCompositionText',data:'목'})); }")
+            search.dispatch_event('compositionupdate', {'data':'없는품목'})
+            phone.wait_for_function("document.querySelector('#stock-search-status').textContent==='조회 완료' && new URL(location.href).searchParams.get('q')==='없는품목'")
+            assert phone.locator('.stock-row').count()==0
+            assert search.evaluate('node=>document.activeElement===node')
+            search.evaluate("node => { node.value='DEMO-LAMP-001'; node.dispatchEvent(new InputEvent('input',{bubbles:true,isComposing:true,inputType:'insertCompositionText',data:'1'})); }")
+            phone.wait_for_function("document.querySelector('#stock-search-status').textContent==='조회 완료' && new URL(location.href).searchParams.get('q')==='DEMO-LAMP-001'")
+            assert phone.locator('.stock-row').count()==1
+            assert search.evaluate('node=>document.activeElement===node')
+            search.dispatch_event('compositionend', {'data':'DEMO-LAMP-001'})
+            phone.wait_for_function("document.querySelector('#stock-search-status').textContent==='조회 완료'")
             phone.screenshot(path=str(artifacts/'mobile-stock.png'),full_page=True)
             phone.locator('.stock-row summary').first.click()
             assert phone.locator('.stock-row-detail').first.is_visible()
@@ -319,7 +334,7 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
             assert book.active['H2'].value==2
             book.close()
             assert not errors,errors
-            report={'phone_search_and_rows_only_desktop_controls_preserved':True,'company_logo_loaded_login_and_header':True,'erp_12_char_symbols_single_line_320_to_844':True,'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
+            report={'ime_search_before_blur_compositionend':True,'phone_search_and_rows_only_desktop_controls_preserved':True,'company_logo_loaded_login_and_header':True,'erp_12_char_symbols_single_line_320_to_844':True,'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
             (artifacts/'result.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
             print(json.dumps(report,ensure_ascii=False,indent=2))
             browser.close()

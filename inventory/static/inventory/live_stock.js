@@ -3,7 +3,7 @@
   if (!form) return;
   const results = document.querySelector(form.dataset.results || '#stock-results');
   const status = document.querySelector(form.dataset.status || '#stock-search-status');
-  let timer, controller, serial = 0, composing = false;
+  let timer, controller, serial = 0;
   async function refresh(url) {
     clearTimeout(timer);
     const version = ++serial;
@@ -35,7 +35,6 @@
     return target;
   }
   function schedule() {
-    if (composing) return;
     clearTimeout(timer);
     status.textContent = '조회 대기…';
     // Invalidate and cancel in-flight work immediately, even during debounce.
@@ -43,8 +42,11 @@
     if (controller) controller.abort();
     timer = setTimeout(() => refresh(url()), 300);
   }
-  form.addEventListener('compositionstart', () => { composing = true; clearTimeout(timer); serial++; if (controller) controller.abort(); });
-  form.addEventListener('compositionend', () => { composing = false; schedule(); });
+  // Some phone keyboards keep composition active until blur. Search the current
+  // text after a pause even during composition; only replace results, never the input.
+  form.addEventListener('compositionstart', schedule);
+  form.addEventListener('compositionupdate', schedule);
+  form.addEventListener('compositionend', schedule);
   form.addEventListener('input', schedule);
   form.addEventListener('change', schedule);
   form.addEventListener('submit', event => {event.preventDefault(); refresh(url());});
