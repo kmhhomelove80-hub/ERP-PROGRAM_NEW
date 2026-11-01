@@ -1,7 +1,8 @@
 (() => {
-  const form = document.querySelector('#stock-filter');
-  const results = document.querySelector('#stock-results');
-  const status = document.querySelector('#stock-search-status');
+  const form = document.querySelector('[data-live-filter], #stock-filter');
+  if (!form) return;
+  const results = document.querySelector(form.dataset.results || '#stock-results');
+  const status = document.querySelector(form.dataset.status || '#stock-search-status');
   let timer, controller, serial = 0, composing = false;
   async function refresh(url) {
     clearTimeout(timer);
@@ -36,6 +37,7 @@
   function schedule() {
     if (composing) return;
     clearTimeout(timer);
+    status.textContent = '조회 대기…';
     // Invalidate and cancel in-flight work immediately, even during debounce.
     serial++;
     if (controller) controller.abort();

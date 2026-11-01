@@ -191,6 +191,23 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
             phone.reload()
             assert phone.get_by_text('완료',exact=True).is_visible()
             phone.screenshot(path=str(artifacts/'mobile-completed.png'),full_page=True)
+            phone.goto(base+'/movements/?status=completed')
+            search = phone.get_by_role('textbox',name='품번 또는 위치 검색')
+            search.fill('NO-SUCH-LOCATION')
+            phone.wait_for_function("document.querySelector('#movement-search-status').textContent==='조회 완료'")
+            assert phone.get_by_text('해당 요청이 없습니다.',exact=True).is_visible()
+            search.fill('B0202')
+            phone.wait_for_function("document.querySelector('#movement-search-status').textContent==='조회 완료'")
+            assert phone.locator('.movement-cards article').count()==1
+            assert 'status=completed' in phone.url
+            search.fill('')
+            phone.get_by_label('요청 상태',exact=True).select_option('pending')
+            phone.wait_for_function("document.querySelector('#movement-search-status').textContent==='조회 완료'")
+            assert phone.get_by_text('해당 요청이 없습니다.',exact=True).is_visible()
+            phone.get_by_label('요청 상태',exact=True).select_option('')
+            phone.wait_for_function("document.querySelector('#movement-search-status').textContent==='조회 완료'")
+            assert phone.locator('.movement-cards article').count()==1
+
             pc.goto(base+'/history/?action=movement&q=DEMO-LAMP-001')
             assert pc.get_by_text('A0101 → B0202 · 완료',exact=False).is_visible()
             pc.screenshot(path=str(artifacts/'desktop-history.png'),full_page=True)
@@ -276,7 +293,7 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
             assert book.active['H2'].value==2
             book.close()
             assert not errors,errors
-            report={'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
+            report={'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
             (artifacts/'result.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
             print(json.dumps(report,ensure_ascii=False,indent=2))
             browser.close()

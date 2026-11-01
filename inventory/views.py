@@ -169,7 +169,7 @@ def movement_list(request):
     if status in ['pending','completed','rejected']: rows = rows.filter(state=status)
     else: status = ''
     if query: rows = rows.filter(Q(source__item__code__icontains=query)|Q(source__location__icontains=query)|Q(destination__icontains=query))
-    return render(request,'inventory/movements.html',{'page_obj':Paginator(rows,30).get_page(request.GET.get('page')),'status':status,'query':query})
+    return render(request,'inventory/movement_results.html' if request.GET.get('partial')=='1' else 'inventory/movements.html',{'page_obj':Paginator(rows,30).get_page(request.GET.get('page')),'status':status,'query':query})
 
 @login_required
 def movement_detail(request, pk):
