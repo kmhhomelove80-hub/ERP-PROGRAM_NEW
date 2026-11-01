@@ -1,0 +1,11 @@
+{% extends 'inventory/base.html' %}{% load static %}
+{% block title %}사용 매뉴얼 · 선일일렉콤{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'inventory/manual.css' %}">
+<div class="manual-header"><div><h1>사용 매뉴얼</h1><p>프로그램과 함께 제공되는 최신 업무 안내입니다. 검색하거나 목차를 눌러 확인하세요.</p><p><small>별도 문서를 설치하거나 보관할 필요가 없습니다. 운영 화면에서 열면 작성 중인 내용을 유지하도록 새 탭으로 표시합니다.</small></p></div><div class="manual-actions"><a class="button" href="{% url 'user-manual-pdf' %}" target="_blank" rel="noopener">PDF 보기</a><a href="{% url 'user-manual-pdf' %}?download=1">PDF 다운로드</a></div></div>
+<form class="manual-search no-print" method="get" role="search"><label for="manual-query">궁금한 업무 검색</label><div><input id="manual-query" name="q" value="{{ query }}" maxlength="200" placeholder="예: 추가 피킹, 신규 품목, 이동, 권한"><button>찾기</button>{% if query %}<a href="{% url 'user-manual' %}">전체 보기</a>{% endif %}</div></form>
+<div class="manual-quick no-print" aria-label="자주 찾는 사용법"><a href="{% url 'user-manual' %}#manual-chapter-3">재고 조회·정렬</a><a href="{% url 'user-manual' %}#manual-chapter-6">기존·신규 입고</a><a href="{% url 'user-manual' %}#manual-chapter-7">피킹·추가 배정</a><a href="{% url 'user-manual' %}#manual-chapter-5">이동 요청</a><a href="{% url 'user-manual' %}#manual-chapter-12">문제 해결</a></div>
+{% if query %}<p role="status">‘{{ query }}’ 관련 안내 {{ matches|length }}개 장</p>{% endif %}
+<div class="manual-layout"><aside class="manual-toc no-print"><details {% if not query %}open{% endif %}><summary>목차</summary><ol>{% for chapter in chapters %}<li><a href="{% if query %}{% url 'user-manual' %}{% endif %}#{{ chapter.id }}">{{ chapter.title }}</a></li>{% endfor %}</ol></details></aside>
+<div class="manual-content">{% for chapter in matches %}<section id="{{ chapter.id }}" class="manual-chapter">{{ chapter.html }}</section>{% empty %}<div class="card"><h2>관련 안내를 찾지 못했습니다.</h2><p>‘입고’, ‘취소’, ‘피킹’처럼 짧은 단어로 검색하거나 목차에서 업무를 선택하세요.</p><a href="{% url 'user-manual' %}">전체 매뉴얼 보기</a></div>{% endfor %}</div></div>
+{% endblock %}

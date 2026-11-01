@@ -96,7 +96,7 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
                 phone.set_viewport_size({'width':width,'height':height})
                 assert phone.evaluate('document.documentElement.scrollWidth <= innerWidth'),(width,height)
                 tabs=phone.locator('.mobile-bottom-nav a')
-                assert tabs.count()==2
+                assert tabs.count()==3
                 for tab in tabs.all():
                     box=tab.bounding_box();assert box['height']>=44 and box['width']>=44
                 # Twelve-character ERP codes, including symbols, stay on one line.
@@ -227,7 +227,7 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
             login(pc,'browser-admin')
             manager_phone=desktop.new_page();manager_phone.set_viewport_size({'width':390,'height':844})
             manager_phone.goto(base+'/')
-            assert manager_phone.locator('header .desktop-only').count()==7
+            assert manager_phone.locator('header .desktop-only').count()==8
             assert manager_phone.locator('header .desktop-only').evaluate_all("nodes=>nodes.every(e=>getComputedStyle(e).display==='none')")
             assert not manager_phone.get_by_role('link',name='현재 검색 전체 엑셀 내보내기',exact=True).is_visible()
             manager_phone.set_viewport_size({'width':844,'height':390})
@@ -437,6 +437,33 @@ print(order.pk)
             assert pc.locator('.desktop-stock-table .stock-spec').inner_text()=='AC220V / IP67 / 신규 자재 사양'
             pc.goto(base+'/receipts/new/')
             assert pc.locator('select[name=item] option').filter(has_text='NEW-RECEIPT1').count()==1
+            # Open in-app help without abandoning an unfinished receipt form.
+            pc.get_by_label('수량',exact=False).fill('9')
+            work_url=pc.url
+            with desktop.expect_page() as opened:
+                pc.get_by_role('link',name='사용 매뉴얼',exact=True).click()
+            manual_page=opened.value
+            manual_page.wait_for_load_state()
+            manual_page.on('pageerror',lambda error:errors.append(str(error)))
+            assert pc.url==work_url
+            assert pc.get_by_label('수량',exact=False).input_value()=='9'
+            assert manual_page.get_by_role('heading',name='사용 매뉴얼',exact=True).is_visible()
+            assert manual_page.locator('.manual-chapter').count()==14
+            manual_page.get_by_label('궁금한 업무 검색',exact=True).fill('신규품목')
+            manual_page.get_by_role('button',name='찾기',exact=True).click()
+            assert manual_page.locator('#manual-chapter-6').is_visible()
+            assert manual_page.locator('.manual-chapter').count()<14
+            assert manual_page.locator('.manual-toc details').get_attribute('open') is None
+            manual_page.screenshot(path=str(artifacts/'in-app-manual-pc.png'))
+            for width,height in [(320,640),(390,844),(844,390)]:
+                manual_page.set_viewport_size({'width':width,'height':height})
+                assert manual_page.evaluate('document.documentElement.scrollWidth<=innerWidth'),width
+                assert manual_page.get_by_role('navigation',name='휴대폰 메뉴').get_by_role('link',name='매뉴얼',exact=True).is_visible()
+            manual_page.set_viewport_size({'width':390,'height':844})
+            manual_page.screenshot(path=str(artifacts/'in-app-manual-phone.png'))
+            pdf_response=manual_page.request.get(base+'/manual/pdf/')
+            assert pdf_response.status==200 and pdf_response.body().startswith(b'%PDF')
+            manual_page.close()
             reader_context=browser.new_context(viewport={'width':1440,'height':1000})
             reader_page=reader_context.new_page()
             reader_page.on('pageerror',lambda error:errors.append(str(error)))
@@ -460,7 +487,7 @@ print(order.pk)
                 assert pc.locator(f'[name="{name}"]').count()==0
             pc.screenshot(path=str(artifacts/'simple-user-permissions.png'),full_page=True)
             assert not errors,errors
-            report={'existing_new_item_selection_and_atomic_receipt_ui':True,'actual_code128_photo_local_decoder':True,'phone_scan_icon_desktop_hidden_photo_picker_return':True,'desktop_single_line_specifications_with_table_scroll':True,'same_order_80_released_20_supplemented':True,'two_roles_simple_admin_and_reader_no_mutation_controls':True,'mobile_all_headers_toggle_numeric_sort_and_search_preserves_order':True,'ime_search_before_blur_compositionend':True,'phone_search_and_rows_only_desktop_controls_preserved':True,'company_logo_loaded_login_and_header':True,'erp_12_char_symbols_single_line_320_to_844':True,'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
+            report={'in_app_manual_search_pdf_and_unsaved_form_preserved':True,'existing_new_item_selection_and_atomic_receipt_ui':True,'actual_code128_photo_local_decoder':True,'phone_scan_icon_desktop_hidden_photo_picker_return':True,'desktop_single_line_specifications_with_table_scroll':True,'same_order_80_released_20_supplemented':True,'two_roles_simple_admin_and_reader_no_mutation_controls':True,'mobile_all_headers_toggle_numeric_sort_and_search_preserves_order':True,'ime_search_before_blur_compositionend':True,'phone_search_and_rows_only_desktop_controls_preserved':True,'company_logo_loaded_login_and_header':True,'erp_12_char_symbols_single_line_320_to_844':True,'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
             (artifacts/'result.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
             print(json.dumps(report,ensure_ascii=False,indent=2))
             browser.close()

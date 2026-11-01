@@ -608,3 +608,32 @@ def picking_supplement(request, pk):
                                       salt='picking-supplement', compress=True)
                 form = PickingSupplementForm(initial={'preview_token': token})
     return render(request, 'inventory/picking_supplement.html', {'order': order, 'preview': preview, 'form': form})
+
+
+@login_required
+def user_manual(request):
+    from django.http import HttpResponseNotAllowed
+    from .manual import manual_chapters, search_key
+    if request.method not in ('GET', 'HEAD'):
+        return HttpResponseNotAllowed(['GET', 'HEAD'])
+    query = request.GET.get('q', '').strip()[:200]
+    chapters = manual_chapters()
+    key = search_key(query)
+    matches = [chapter for chapter in chapters if not key or key in chapter['search_text']]
+    if key:
+        matches.sort(key=lambda chapter: key not in chapter['topic'])
+    return render(request, 'inventory/manual.html', {'chapters': chapters, 'matches': matches, 'query': query})
+
+
+@login_required
+def user_manual_pdf(request):
+    from django.http import FileResponse, Http404, HttpResponseNotAllowed
+    from .manual import manual_path
+    if request.method not in ('GET', 'HEAD'):
+        return HttpResponseNotAllowed(['GET', 'HEAD'])
+    try:
+        document = manual_path('pdf').open('rb')
+    except OSError as error:
+        raise Http404('PDF 매뉴얼이 없습니다. 프로그램 배포 파일을 확인해 주세요.') from error
+    return FileResponse(document, content_type='application/pdf', filename='SUNIL_ERP_Manual.pdf',
+                        as_attachment=request.GET.get('download') == '1')
