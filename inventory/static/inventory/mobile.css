@@ -118,24 +118,19 @@
  .stock-row-heading a:focus-visible{outline:2px solid #215bc2;outline-offset:-2px}
 }
 
-.stock-code-spec small{display:block;white-space:normal;max-width:360px;overflow-wrap:anywhere;line-height:1.45}
-
-/* Desktop: devote the largest share to complete specification text. */
+/* Desktop: compact spreadsheet rows; complete specifications scroll horizontally. */
 @media screen and (min-width:901px){
- .desktop-stock-table table{table-layout:fixed;min-width:1040px}
- .desktop-stock-table .stock-col-spec{width:44%}
- .desktop-stock-table .stock-col-warehouse{width:4%}
- .desktop-stock-table .stock-col-location{width:7%}
- .desktop-stock-table .stock-col-status{width:8%}
- .desktop-stock-table .stock-col-quantity{width:6%}
- .desktop-stock-table .stock-col-pending{width:11%}
- .desktop-stock-table .stock-col-actions{width:8%}
- .desktop-stock-table th,.desktop-stock-table td{padding:10px 6px;vertical-align:top;font-size:13px}
- .desktop-stock-table th{font-size:12px;white-space:normal;overflow-wrap:anywhere}
- .desktop-stock-table .stock-code-spec{white-space:normal;padding-right:16px}
- .desktop-stock-table .stock-code{white-space:nowrap;font-weight:600}
- .desktop-stock-table .stock-code-spec small{max-width:none;line-height:1.65;font-size:13px;color:#304965}
- .desktop-stock-table .stock-location,.desktop-stock-table .stock-status{white-space:normal;overflow-wrap:anywhere}
- .desktop-stock-table .badge{display:inline-block;padding:3px 5px}
- .desktop-stock-table td:nth-child(6) a{white-space:normal;display:block}
+ .desktop-stock-table table{table-layout:auto;width:max-content;min-width:100%}
+ .desktop-stock-table .stock-col-code{width:176px}
+ .desktop-stock-table .stock-col-spec{width:auto}
+ .desktop-stock-table .stock-col-location{width:80px}
+ .desktop-stock-table .stock-col-status{width:86px}
+ .desktop-stock-table .stock-col-quantity{width:64px}
+ .desktop-stock-table .stock-col-pending{width:80px}
+ .desktop-stock-table .stock-col-actions{width:84px}
+ .desktop-stock-table th,.desktop-stock-table td{padding:6px 8px;vertical-align:middle;font-size:13px;white-space:nowrap;border:1px solid #d7e0d5;line-height:1.4}
+ .desktop-stock-table th{font-size:12px;background:#e0efd8;color:#182940}
+ .desktop-stock-table .stock-code{min-width:176px;font-weight:600}
+ .desktop-stock-table .stock-spec{min-width:420px;max-width:none;overflow:visible;text-overflow:clip;white-space:nowrap;color:#304965}
+ .desktop-stock-table .badge{display:inline-block;padding:2px 4px}
 }

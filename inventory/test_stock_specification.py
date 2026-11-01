@@ -14,12 +14,16 @@ class StockSpecificationTests(TestCase):
         for params in [{},{'partial':'1'},{'partial':'1','sort':'location','direction':'desc'}]:
             response=self.client.get('/',params)
             html=response.content.decode().split('<div class="mobile-stock-cards">')[0]
-            self.assertIn('ERP 코드 / 사양',html)
-            self.assertIn('DC24V<br>IP67 &lt;시험&gt;',html)
+            self.assertIn('<th>ITEM No.</th><th>사양</th>',html)
+            self.assertIn('DC24V IP67 &lt;시험&gt;',html)
             self.assertIn('AC220V 기본 사양',html)
             self.assertNotIn('위치 모델명',html)
             self.assertNotIn('기본 모델명',html)
             self.assertNotIn('ERP 코드 / 모델',html)
+            self.assertNotIn('<th>창고</th>',html)
+            self.assertNotIn('<td>Y09</td>',html)
+            self.assertIn('완료',html)
+            self.assertNotIn('>입고 완료</span>',html)
 
     def test_missing_spec_is_explicit_and_search_still_matches_spec(self):
         item=Item.objects.create(code='NO-SPEC00001',name='미등록 모델')
@@ -28,3 +32,12 @@ class StockSpecificationTests(TestCase):
         response=self.client.get('/',{'q':'IP67'})
         self.assertEqual(response.context['page_obj'].paginator.count,1)
         self.assertEqual(response.context['page_obj'][0].location,'A01')
+
+    def test_writer_sees_short_movement_label_and_expected_status(self):
+        user=get_user_model().objects.create_user('spec-full',is_staff=True)
+        self.client.force_login(user)
+        Stock.objects.create(item=self.item,location='PRE',quantity=1,status='expected')
+        html=self.client.get('/').content.decode().split('<div class="mobile-stock-cards">')[0]
+        self.assertIn('>이동</a>',html)
+        self.assertNotIn('>이동 요청</a>',html)
+        self.assertIn('>예정</span>',html)

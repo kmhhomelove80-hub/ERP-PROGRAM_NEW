@@ -354,17 +354,20 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
             assert 'sort=available' in phone.url
             assert phone.locator('.stock-item').count()==1
             phone.screenshot(path=str(artifacts/'mobile-sort.png'),full_page=True)
-            # Long specifications are fully visible in a wider desktop column.
+            # Spreadsheet-style specifications stay complete on a single compact row.
             pc.goto(base+'/?q=SORT-AAA')
-            assert pc.locator('.desktop-stock-table th').first.inner_text()=='ERP 코드 / 사양'
+            assert pc.locator('.desktop-stock-table th').first.inner_text()=='ITEM No.'
+            assert pc.locator('.desktop-stock-table th').nth(1).inner_text()=='사양'
+            assert pc.locator('.desktop-stock-table th').nth(7).inner_text()=='출하대기'
             long_spec='AC220V / IP67 / 선박용 등기구 / 브라켓 포함 / 방수·방진 사양 / '+('추가 상세 사양 '*16)
-            pc.locator('.stock-code-spec small').first.evaluate('(node,text)=>node.textContent=text',long_spec)
-            assert pc.locator('.stock-code-spec').first.evaluate("""node=>{
-                const text=node.querySelector('small');
-                const cell=node.getBoundingClientRect(),next=node.nextElementSibling.getBoundingClientRect();
-                return text.scrollWidth<=text.clientWidth+1 && text.scrollHeight<=text.clientHeight+1
-                    && cell.right<=next.left+1 && cell.width/node.closest('table').getBoundingClientRect().width>=0.43;
+            pc.locator('.stock-spec').first.evaluate('(node,text)=>node.textContent=text',long_spec)
+            assert pc.locator('.stock-spec').first.evaluate("""node=>{
+                const style=getComputedStyle(node),cell=node.getBoundingClientRect();
+                return style.whiteSpace==='nowrap' && style.textOverflow!=='ellipsis'
+                    && node.scrollWidth<=node.clientWidth+1 && cell.height<48;
             }""")
+            assert pc.evaluate('document.documentElement.scrollWidth<=innerWidth')
+            assert pc.locator('.desktop-stock-table').evaluate('node=>node.scrollWidth>node.clientWidth')
             pc.screenshot(path=str(artifacts/'desktop-specification-width.png'),full_page=True)
             # Existing order: ship 80, receive 20 later, append to the same picking list.
             supplement_seed = """import uuid
@@ -420,7 +423,7 @@ print(order.pk)
                 assert pc.locator(f'[name="{name}"]').count()==0
             pc.screenshot(path=str(artifacts/'simple-user-permissions.png'),full_page=True)
             assert not errors,errors
-            report={'desktop_wide_unclipped_specifications':True,'same_order_80_released_20_supplemented':True,'two_roles_simple_admin_and_reader_no_mutation_controls':True,'mobile_all_headers_toggle_numeric_sort_and_search_preserves_order':True,'ime_search_before_blur_compositionend':True,'phone_search_and_rows_only_desktop_controls_preserved':True,'company_logo_loaded_login_and_header':True,'erp_12_char_symbols_single_line_320_to_844':True,'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
+            report={'desktop_single_line_specifications_with_table_scroll':True,'same_order_80_released_20_supplemented':True,'two_roles_simple_admin_and_reader_no_mutation_controls':True,'mobile_all_headers_toggle_numeric_sort_and_search_preserves_order':True,'ime_search_before_blur_compositionend':True,'phone_search_and_rows_only_desktop_controls_preserved':True,'company_logo_loaded_login_and_header':True,'erp_12_char_symbols_single_line_320_to_844':True,'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
             (artifacts/'result.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
             print(json.dumps(report,ensure_ascii=False,indent=2))
             browser.close()
