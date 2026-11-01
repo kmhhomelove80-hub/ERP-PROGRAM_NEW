@@ -16,6 +16,27 @@ def stock_list(request):
     if query:
         stocks = stocks.filter(Q(item__code__icontains=query)|Q(item__name__icontains=query)|Q(item__specification__icontains=query)|Q(location__icontains=query)|Q(legacy_name__icontains=query)|Q(legacy_specification__icontains=query))
     if status in Stock.Status.values: stocks = stocks.filter(status=status)
+    # Sort the full filtered queryset before pagination; never accept SQL field names.
+    from django.db.models import F, Min, Value
+    from django.db.models.functions import Coalesce
+    from urllib.parse import urlencode
+    fields = {'code': 'item__code', 'available': 'sort_available', 'location': 'location', 'allocated': 'reserved', 'hull': 'sort_hull'}
+    sort = request.GET.get('sort', 'code')
+    if sort not in fields:
+        sort = 'code'
+    direction = 'desc' if request.GET.get('direction') == 'desc' else 'asc'
+    stocks = stocks.annotate(sort_available=F('quantity') - F('reserved'))
+    if sort == 'hull':
+        stocks = stocks.annotate(sort_hull=Coalesce(Min('allocation__project', filter=Q(allocation__state='reserved')), Value('')))
+    stocks = stocks.order_by(('-' if direction == 'desc' else '') + fields[sort], 'item__code', 'location', 'pk')
+    sort_headers = []
+    for key, label in [('code', 'ITEM No.'), ('available', '잔량'), ('location', 'Location'), ('allocated', 'allocated'), ('hull', 'HULL')]:
+        active = sort == key
+        next_direction = 'desc' if active and direction == 'asc' else 'asc'
+        sort_headers.append({'label': label, 'key': key, 'active': active,
+                             'arrow': '↑' if direction == 'asc' else '↓',
+                             'aria': ('ascending' if direction == 'asc' else 'descending') if active else 'none',
+                             'url': '?' + urlencode({'q': query, 'status': status, 'sort': key, 'direction': next_direction})})
     totals = stocks.aggregate(quantity=Sum('quantity'),reserved=Sum('reserved'))
     page=Paginator(stocks,50).get_page(request.GET.get('page'))
     from .models import Allocation
@@ -27,7 +48,7 @@ def stock_list(request):
     from .reconciliation import latest_reference
     reference,erp_snapshot=latest_reference('Y09',[s.item.code for s in page.object_list])
     for stock in page.object_list:stock.erp_pending=reference.get(stock.item.code,{}).get('shipping_pending')
-    return render(request,'inventory/stock_results.html' if request.GET.get('partial')=='1' else 'inventory/stock_list.html',{'page_obj':page, 'query':query,'status':status,'totals':totals,'statuses':Stock.Status.choices,'erp_snapshot':erp_snapshot})
+    return render(request,'inventory/stock_results.html' if request.GET.get('partial')=='1' else 'inventory/stock_list.html',{'page_obj':page, 'query':query,'status':status,'totals':totals,'statuses':Stock.Status.choices,'erp_snapshot':erp_snapshot,'sort':sort,'direction':direction,'sort_headers':sort_headers})
 
 @user_passes_test(lambda user: user.is_active and user.is_staff)
 def receipt_create(request):

@@ -110,3 +110,10 @@
  #stock-filter select,#stock-filter button,.scan-controls,.stock-erp-note,.stock-overview{display:none!important}
  #stock-search-status{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 }
+
+@media screen and (max-width:900px){
+ .stock-row-heading>span{padding:0}
+ .stock-row-heading a{display:flex;align-items:center;min-height:44px;padding:10px 8px;color:#182940;text-decoration:none}
+ .stock-row-heading a[aria-current=true]{color:#164da9;font-weight:700;background:#edf4ff}
+ .stock-row-heading a:focus-visible{outline:2px solid #215bc2;outline-offset:-2px}
+}

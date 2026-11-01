@@ -333,8 +333,28 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
             book=load_workbook(artifacts/'erp-comparison-export.xlsx')
             assert book.active['H2'].value==2
             book.close()
+            sort_seed = "from inventory.models import Item, Stock; a=Item.objects.create(code='SORT-AAA',name='정렬 검증'); b=Item.objects.create(code='SORT-BBB',name='정렬 검증'); Stock.objects.create(item=a,location='Z01',quantity=12); Stock.objects.create(item=b,location='A01',quantity=2)"
+            subprocess.run([str(python),'manage.py','shell','-c',sort_seed],cwd=root,env=environment,check=True,stdout=subprocess.DEVNULL)
+            phone.goto(base+'/?q=SORT-')
+            for key in ['available','location','allocated','hull','code']:
+                phone.locator(f'[data-sort="{key}"]').click()
+                phone.wait_for_function("([key]) => new URL(location.href).searchParams.get('sort')===key && document.querySelector('#stock-search-status').textContent==='조회 완료'", arg=[key])
+                first_direction = 'asc'
+                assert phone.locator(f'[data-sort="{key}"]').inner_text().endswith('↓' if first_direction=='desc' else '↑')
+                if key=='available': assert phone.locator('.stock-item').first.inner_text()=='SORT-BBB'
+                phone.locator(f'[data-sort="{key}"]').click()
+                second_direction = 'asc' if first_direction=='desc' else 'desc'
+                phone.wait_for_function("([key,direction]) => new URL(location.href).searchParams.get('sort')===key && new URL(location.href).searchParams.get('direction')===direction && document.querySelector('#stock-search-status').textContent==='조회 완료'",arg=[key,second_direction])
+                if key=='available': assert phone.locator('.stock-item').first.inner_text()=='SORT-AAA'
+            phone.locator('[data-sort="available"]').click()
+            phone.wait_for_function("new URL(location.href).searchParams.get('sort')==='available' && document.querySelector('#stock-search-status').textContent==='조회 완료'")
+            phone.get_by_role('textbox',name='재고 검색',exact=True).fill('SORT-BBB')
+            phone.wait_for_function("new URL(location.href).searchParams.get('q')==='SORT-BBB' && document.querySelector('#stock-search-status').textContent==='조회 완료'")
+            assert 'sort=available' in phone.url
+            assert phone.locator('.stock-item').count()==1
+            phone.screenshot(path=str(artifacts/'mobile-sort.png'),full_page=True)
             assert not errors,errors
-            report={'ime_search_before_blur_compositionend':True,'phone_search_and_rows_only_desktop_controls_preserved':True,'company_logo_loaded_login_and_header':True,'erp_12_char_symbols_single_line_320_to_844':True,'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
+            report={'mobile_all_headers_toggle_numeric_sort_and_search_preserves_order':True,'ime_search_before_blur_compositionend':True,'phone_search_and_rows_only_desktop_controls_preserved':True,'company_logo_loaded_login_and_header':True,'erp_12_char_symbols_single_line_320_to_844':True,'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
             (artifacts/'result.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
             print(json.dumps(report,ensure_ascii=False,indent=2))
             browser.close()

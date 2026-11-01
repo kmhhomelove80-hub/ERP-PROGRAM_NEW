@@ -31,7 +31,11 @@
   }
   function url() {
     const target = new URL(location.href);
-    target.search = new URLSearchParams(new FormData(form)).toString();
+    const params = new URLSearchParams(new FormData(form));
+    for (const key of ['sort', 'direction']) {
+      if (target.searchParams.has(key)) params.set(key, target.searchParams.get(key));
+    }
+    target.search = params.toString();
     return target;
   }
   function schedule() {
@@ -51,9 +55,15 @@
   form.addEventListener('change', schedule);
   form.addEventListener('submit', event => {event.preventDefault(); refresh(url());});
   results.addEventListener('click', event => {
-    const link = event.target.closest('nav a');
+    const link = event.target.closest('nav a, a[data-sort-link]');
     if (link && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
-      event.preventDefault(); refresh(new URL(link.href));
+      if (event.button !== 0 || event.altKey) return;
+      event.preventDefault();
+      const target = new URL(link.href);
+      if (link.hasAttribute('data-sort-link')) {
+        for (const [key, value] of new FormData(form)) target.searchParams.set(key, value);
+      }
+      refresh(target);
     }
   });
 })();
