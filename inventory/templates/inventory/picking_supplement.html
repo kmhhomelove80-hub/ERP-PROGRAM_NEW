@@ -1,0 +1,13 @@
+{% extends 'inventory/base.html' %}{% block content %}
+<h1>미배정 물량 추가 피킹</h1><p>{{ order.project }} · {{ order.number }}</p>
+<p><a href="{% url 'picking-detail' order.pk %}">기존 Picking List로</a> · <a href="{% url 'picking-supplement' order.pk %}">입고 재고 다시 조회</a></p>
+<p class="notice">새 주문을 만들지 않고 기존 주문에 추가 예약합니다. 이미 예약·출고·대체 배정한 수량은 제외하고, 입고 완료된 Y09 가용 재고만 사용합니다. 취소한 수량은 자동으로 다시 예약하지 않습니다. 미리보기는 예약이 아니며 30분간 유효합니다.</p>
+{% if preview.cancelled_order %}<p class="notice">이 주문은 기존 배정이 모두 취소되어 추가 배정하지 않습니다. 고객 주문 상태를 담당자와 확인하세요.</p>{% endif %}
+{% if preview %}
+<h2>원래 요청과 추가 대상</h2><div class="table"><table><tr><th>요청 ERP 코드</th><th>원래 요청</th><th>기존 유효 배정·출고</th><th>취소 제외</th><th>추가 대상</th></tr>{% for row in preview.balance %}<tr><td>{{ row.code }}</td><td>{{ row.requested }}</td><td>{{ row.allocated }}</td><td>{{ row.cancelled }}</td><td>{{ row.remaining }}</td></tr>{% endfor %}</table></div>
+<h2>새 입고분 추가 배정 미리보기</h2><div class="table"><table><tr><th>ERP 코드</th><th>모델</th><th>위치</th><th>추가 수량</th></tr>{% for row in preview.allocations %}<tr><td>{{ row.code }}</td><td>{{ row.model }}</td><td>{{ row.location }}</td><td>{{ row.quantity }}</td></tr>{% empty %}<tr><td colspan="4">추가 예약할 입고 완료 재고가 없거나 추가 대상이 없습니다.</td></tr>{% endfor %}</table></div>
+{% if preview.shortages %}<h2>추가 배정 후 남는 부족</h2><div class="table"><table><tr><th>ERP 코드</th><th>이번 대상</th><th>추가 배정</th><th>남은 부족</th></tr>{% for row in preview.shortages %}<tr><td>{{ row.code }}</td><td>{{ row.requested }}</td><td>{{ row.allocated }}</td><td>{{ row.shortage }}</td></tr>{% endfor %}</table></div>{% endif %}
+{% endif %}
+{% if form %}<form method="post" class="card">{% csrf_token %}{{ form.as_p }}<button>기존 주문에 추가 예약 확정</button></form>{% endif %}
+<p>확정 후 기존 피킹리스트와 고객 양식에 함께 표시됩니다. 최초 요청·고객 원본·등록 당시 부족표·이전 출고 이력은 보존합니다. 추가 예약만으로 현재고가 차감되지는 않습니다.</p>
+{% endblock %}

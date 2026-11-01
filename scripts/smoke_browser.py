@@ -354,6 +354,49 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
             assert 'sort=available' in phone.url
             assert phone.locator('.stock-item').count()==1
             phone.screenshot(path=str(artifacts/'mobile-sort.png'),full_page=True)
+            # Long specifications are fully visible in a wider desktop column.
+            pc.goto(base+'/?q=SORT-AAA')
+            assert pc.locator('.desktop-stock-table th').first.inner_text()=='ERP 코드 / 사양'
+            long_spec='AC220V / IP67 / 선박용 등기구 / 브라켓 포함 / 방수·방진 사양 / '+('추가 상세 사양 '*16)
+            pc.locator('.stock-code-spec small').first.evaluate('(node,text)=>node.textContent=text',long_spec)
+            assert pc.locator('.stock-code-spec').first.evaluate("""node=>{
+                const text=node.querySelector('small');
+                const cell=node.getBoundingClientRect(),next=node.nextElementSibling.getBoundingClientRect();
+                return text.scrollWidth<=text.clientWidth+1 && text.scrollHeight<=text.clientHeight+1
+                    && cell.right<=next.left+1 && cell.width/node.closest('table').getBoundingClientRect().width>=0.43;
+            }""")
+            pc.screenshot(path=str(artifacts/'desktop-specification-width.png'),full_page=True)
+            # Existing order: ship 80, receive 20 later, append to the same picking list.
+            supplement_seed = """import uuid
+from django.utils import timezone
+from inventory.models import Item, Stock
+from inventory.picking import plan_picking, confirm_picking
+from inventory.services import release_selected
+from django.contrib.auth import get_user_model
+actor=get_user_model().objects.get(username='browser-admin')
+item=Item.objects.create(code='TOPUP-DEMO01',name='추가 입고 시험')
+Stock.objects.create(item=item,location='FIRST',quantity=80)
+rows=[{'code':item.code,'quantity':100}]
+order=confirm_picking(request_id=uuid.uuid4(),project='분할 입고 80+20',rows=rows,preview=plan_picking(rows),allow_shortage=True,actor=actor)
+release_selected(allocation_ids=list(order.allocations.values_list('pk',flat=True)),shipped_at=timezone.now(),actor=actor)
+Stock.objects.create(item=item,location='LATER',quantity=20)
+print(order.pk)
+"""
+            result=subprocess.run([str(python),'manage.py','shell','-c',supplement_seed],cwd=root,env=environment,check=True,capture_output=True,text=True)
+            supplement_id=result.stdout.strip().splitlines()[-1]
+            pc.goto(base+'/picking/'+supplement_id+'/')
+            pc.get_by_role('link',name='미배정 물량 추가 피킹',exact=True).click()
+            assert pc.get_by_role('heading',name='미배정 물량 추가 피킹',exact=True).is_visible()
+            assert pc.get_by_text('LATER',exact=True).is_visible()
+            pc.screenshot(path=str(artifacts/'picking-supplement-preview.png'),full_page=True)
+            pc.get_by_label('기존 주문과 추가 배정할 코드·위치·수량을 확인했습니다.',exact=True).check()
+            pc.get_by_role('button',name='기존 주문에 추가 예약 확정',exact=True).click()
+            pc.wait_for_url(base+'/picking/'+supplement_id+'/')
+            assert pc.get_by_text('LATER',exact=True).is_visible()
+            assert pc.get_by_text('FIRST',exact=True).is_visible()
+            assert pc.get_by_text('요청 수량과 일치',exact=False).is_visible()
+            assert pc.get_by_role('link',name='미배정 물량 추가 피킹',exact=True).count()==0
+            pc.screenshot(path=str(artifacts/'picking-supplement-complete.png'),full_page=True)
             reader_context=browser.new_context(viewport={'width':1440,'height':1000})
             reader_page=reader_context.new_page()
             reader_page.on('pageerror',lambda error:errors.append(str(error)))
@@ -377,7 +420,7 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
                 assert pc.locator(f'[name="{name}"]').count()==0
             pc.screenshot(path=str(artifacts/'simple-user-permissions.png'),full_page=True)
             assert not errors,errors
-            report={'two_roles_simple_admin_and_reader_no_mutation_controls':True,'mobile_all_headers_toggle_numeric_sort_and_search_preserves_order':True,'ime_search_before_blur_compositionend':True,'phone_search_and_rows_only_desktop_controls_preserved':True,'company_logo_loaded_login_and_header':True,'erp_12_char_symbols_single_line_320_to_844':True,'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
+            report={'desktop_wide_unclipped_specifications':True,'same_order_80_released_20_supplemented':True,'two_roles_simple_admin_and_reader_no_mutation_controls':True,'mobile_all_headers_toggle_numeric_sort_and_search_preserves_order':True,'ime_search_before_blur_compositionend':True,'phone_search_and_rows_only_desktop_controls_preserved':True,'company_logo_loaded_login_and_header':True,'erp_12_char_symbols_single_line_320_to_844':True,'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
             (artifacts/'result.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
             print(json.dumps(report,ensure_ascii=False,indent=2))
             browser.close()

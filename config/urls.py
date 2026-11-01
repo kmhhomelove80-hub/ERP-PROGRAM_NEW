@@ -11,6 +11,7 @@ urlpatterns = [
     path('picking/',views.picking_list,name='picking-list'),
     path('allocation-history/',views.allocation_history,name='allocation-history'),
     path('picking/new/',views.picking_create,name='picking-create'),
+    path('picking/<uuid:pk>/supplement/',views.picking_supplement,name='picking-supplement'),
     path('picking/<uuid:pk>/substitute/',views.substitution_create,name='substitution-create'),
     path('substitutions/',views.substitution_list,name='substitution-list'),
     path('substitutions/<uuid:pk>/',views.substitution_detail,name='substitution-detail'),

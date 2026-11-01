@@ -92,3 +92,44 @@ class PostgreSQLSubstitutionConcurrencyTests(TransactionTestCase):
         self.assertEqual(self.parallel([lambda:self.repay(token),lambda:self.repay(token)]),['settled','settled'])
         from .models import SubstitutionSettlement
         self.assertEqual(SubstitutionSettlement.objects.count(),1)
+
+
+@skipUnless(connection.vendor == 'postgresql','실제 PostgreSQL에서만 동시성 검증')
+class PostgreSQLSupplementConcurrencyTests(TransactionTestCase):
+    parallel = PostgreSQLConcurrencyTests.parallel
+
+    def setUp(self):
+        import uuid
+        from .picking import confirm_picking, plan_picking, plan_supplement
+        self.user = get_user_model().objects.create_user('supplement-concurrent', is_staff=True)
+        item = Item.objects.create(code='TOPUP-CONCURRENT')
+        Stock.objects.create(item=item, location='OLD', quantity=80)
+        rows = [{'code': item.code, 'quantity': 100}]
+        self.order = confirm_picking(request_id=uuid.uuid4(), project='추가 동시성', rows=rows,
+            preview=plan_picking(rows), allow_shortage=True, actor=self.user)
+        self.new = Stock.objects.create(item=item, location='NEW', quantity=20)
+        self.preview = plan_supplement(self.order.pk)
+
+    def attempt(self, request_id):
+        from .picking import confirm_supplement
+        try:
+            confirm_supplement(request_id=request_id, order_id=self.order.pk, preview=self.preview,
+                allow_shortage=True, confirmed=True, actor=self.user)
+            return 'ok'
+        except ValidationError:
+            return 'stale'
+
+    def test_same_addition_only_reserves_once_under_concurrency(self):
+        import uuid
+        request_id = uuid.uuid4()
+        self.assertEqual(self.parallel([lambda: self.attempt(request_id)]*2), ['ok','ok'])
+        self.new.refresh_from_db()
+        self.assertEqual(self.new.reserved,20)
+        self.assertEqual(self.order.allocations.count(),2)
+
+    def test_competing_previews_cannot_overfill_original_order(self):
+        import uuid
+        self.assertCountEqual(self.parallel([lambda: self.attempt(uuid.uuid4())]*2), ['ok','stale'])
+        self.new.refresh_from_db()
+        self.assertEqual(self.new.reserved,20)
+        self.assertEqual(self.order.allocations.count(),2)

@@ -566,3 +566,42 @@ def stock_allocations(request, pk):
         page=Paginator(rows,30).get_page(request.GET.get('page'))
         list(page.object_list)  # Evaluate inside the same snapshot as the totals.
     return render(request,'inventory/stock_allocations.html',{'stock':stock,'page_obj':page,'allocated_total':total,'matches':total==stock.reserved})
+
+
+@warehouse_write
+def picking_supplement(request, pk):
+    import uuid
+    from django.core import signing
+    from .models import PickingOrder
+    from .forms import PickingSupplementForm
+    from .picking import plan_supplement, confirm_supplement
+    order = get_object_or_404(PickingOrder, pk=pk)
+    preview = None
+    form = None
+    if request.method == 'POST':
+        form = PickingSupplementForm(request.POST)
+        if form.is_valid():
+            try:
+                payload = signing.loads(form.cleaned_data['preview_token'], salt='picking-supplement', max_age=1800)
+                if payload['actor'] != request.user.pk or payload['order'] != str(order.pk):
+                    raise ValidationError('주문 또는 미리보기 사용자가 일치하지 않습니다.')
+                confirm_supplement(request_id=payload['request_id'], order_id=order.pk,
+                                   preview=payload['preview'], allow_shortage=form.cleaned_data['allow_shortage'],
+                                   confirmed=form.cleaned_data['confirmed'], actor=request.user)
+            except (signing.BadSignature, ValidationError) as error:
+                form.add_error(None, error if isinstance(error, ValidationError) else '미리보기가 만료되었거나 유효하지 않습니다. 다시 조회하세요.')
+            else:
+                messages.success(request, '기존 주문에 추가 피킹을 예약했습니다. 주문 번호는 유지되며 실제 출고 후 Release하세요.')
+                return redirect('picking-detail', pk=order.pk)
+    else:
+        try:
+            preview = plan_supplement(order.pk)
+        except ValidationError as error:
+            messages.error(request, ' / '.join(error.messages))
+        else:
+            if preview['allocations']:
+                token = signing.dumps({'actor': request.user.pk, 'order': str(order.pk),
+                                       'request_id': str(uuid.uuid4()), 'preview': preview},
+                                      salt='picking-supplement', compress=True)
+                form = PickingSupplementForm(initial={'preview_token': token})
+    return render(request, 'inventory/picking_supplement.html', {'order': order, 'preview': preview, 'form': form})

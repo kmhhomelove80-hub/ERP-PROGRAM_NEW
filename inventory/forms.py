@@ -81,7 +81,7 @@ class MovementProcessForm(forms.Form):
 
 class HistoryFilterForm(forms.Form):
     q = forms.CharField(label='검색',required=False,max_length=100)
-    action = forms.ChoiceField(label='작업 종류',required=False,choices=[('','전체'),('initial_import','초기 이관'),('receipt','입고'),('receipt_batch','일괄 입고'),('substitution_reserved','대체 예약'),('substitution_dispatch','대체 출고(빌림)'),('substitution_settlement','입고분 상환'),('substitution_cancel','대체 예약 취소'),('substitution_erp','회사 ERP 정산 확인'),('receipt_cancel','입고 취소'),('arrival','도착 확인'),('reserve','예약'),('cancel','예약 취소'),('release','출고 확정'),('picking_confirm','피킹 등록'),('movement_requested','이동 요청'),('movement','이동 처리'),('erp_snapshot','ERP 대조 등록'),('reconciliation_review','차이 분석 기록'),('legacy_archive','과거 이력 보관 이관')])
+    action = forms.ChoiceField(label='작업 종류',required=False,choices=[('','전체'),('initial_import','초기 이관'),('receipt','입고'),('receipt_batch','일괄 입고'),('substitution_reserved','대체 예약'),('substitution_dispatch','대체 출고(빌림)'),('substitution_settlement','입고분 상환'),('substitution_cancel','대체 예약 취소'),('substitution_erp','회사 ERP 정산 확인'),('receipt_cancel','입고 취소'),('arrival','도착 확인'),('reserve','예약'),('cancel','예약 취소'),('release','출고 확정'),('picking_confirm','피킹 등록'),('picking_supplement','미배정 추가 피킹'),('movement_requested','이동 요청'),('movement','이동 처리'),('erp_snapshot','ERP 대조 등록'),('reconciliation_review','차이 분석 기록'),('legacy_archive','과거 이력 보관 이관')])
     start = forms.DateField(label='시작일',required=False,widget=forms.DateInput(attrs={'type':'date'}))
     end = forms.DateField(label='종료일',required=False,widget=forms.DateInput(attrs={'type':'date'}))
     def clean(self):
@@ -195,3 +195,9 @@ class SubstitutionErpForm(forms.Form):
 class SubstitutionCancelForm(forms.Form):
     note=forms.CharField(label='대체 예약 취소 사유',max_length=1000,widget=forms.Textarea(attrs={'rows':2}))
     confirmed=forms.BooleanField(label='아직 실물 대체 출고 전이며 예약만 취소합니다.')
+
+
+class PickingSupplementForm(forms.Form):
+    preview_token = forms.CharField(widget=forms.HiddenInput, max_length=500000)
+    confirmed = forms.BooleanField(label='기존 주문과 추가 배정할 코드·위치·수량을 확인했습니다.')
+    allow_shortage = forms.BooleanField(label='남은 부족 수량을 확인했으며, 입고 완료된 가용 수량만 추가 예약합니다.', required=False)

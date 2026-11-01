@@ -28,11 +28,13 @@ def parse_paste(text):
         if rows[code] > MAX_QUANTITY: raise ValidationError(f'{n}행: 합산 수량이 허용 범위를 초과합니다.')
     return [{'code':code,'quantity':qty} for code,qty in rows.items()]
 
-def plan_picking(rows):
+def plan_picking(rows, *, received_only=False):
     available = {}
     # Original Excel scans stock rows in their original order. Initial import
     # preserves that order as PK; do not imply FIFO or location optimization.
     stocks = Stock.objects.select_related('item').filter(warehouse='Y09',quantity__gt=F('reserved'),item__code__in=[r['code'] for r in rows]).order_by('pk')
+    if received_only:
+        stocks = stocks.filter(status=Stock.Status.RECEIVED)
     for s in stocks: available.setdefault(s.item.code,[]).append(s)
     allocations, shortages = [], []
     for row in rows:
@@ -103,3 +105,67 @@ def parse_quantity_code(text):
             raise ValidationError(f'{number}행: 첫 열은 양의 정수 수량, 두 번째 열은 ERP 코드입니다.')
         swapped.append(code+'\t'+quantity)
     return parse_paste('\n'.join(swapped))
+
+
+@warehouse_transaction
+def plan_supplement(order_id):
+    """Only never-allocated demand; cancelled quantities are not silently revived."""
+    from collections import Counter
+    from .substitutions import demand_balance, requested_code
+    order = PickingOrder.objects.select_for_update().get(pk=order_id)
+    if not order.payload.get('rows'):
+        raise ValidationError('원래 요청 수량이 없는 이전 주문은 추가 배정할 수 없습니다. 담당자에게 확인하세요.')
+    cancelled = Counter()
+    for allocation in order.allocations.filter(state='cancelled').select_related('stock__item', 'substitution'):
+        cancelled[requested_code(allocation)] += allocation.quantity
+    cancelled_order = order.allocations.exists() and not order.allocations.exclude(state='cancelled').exists()
+    balance = demand_balance(order)
+    for row in balance:
+        row['cancelled'] = cancelled[row['code']]
+        row['remaining'] = 0 if cancelled_order else max(row['shortage'] - row['cancelled'], 0)
+    rows = [{'code': row['code'], 'quantity': row['remaining']} for row in balance if row['remaining']]
+    preview = plan_picking(rows, received_only=True)
+    return {'balance': balance, 'cancelled_order': cancelled_order, **preview}
+
+
+@warehouse_transaction
+def confirm_supplement(*, request_id, order_id, preview, allow_shortage, confirmed, actor):
+    """Append reservations atomically, retaining the original demand and shortage snapshot."""
+    import uuid
+    from .models import AuditEvent
+    if not actor.is_active or not actor.is_staff:
+        raise ValidationError('모든 권한 계정만 추가 피킹을 확정할 수 있습니다.')
+    if not confirmed:
+        raise ValidationError('기존 주문과 추가 배정 수량을 확인하세요.')
+    try:
+        request_id = uuid.UUID(str(request_id))
+    except (ValueError, TypeError, AttributeError) as error:
+        raise ValidationError('추가 요청번호가 유효하지 않습니다.') from error
+    order = PickingOrder.objects.select_for_update().get(pk=order_id)
+    previous = AuditEvent.objects.filter(action='picking_supplement', reference=str(request_id)).first()
+    if previous:
+        if previous.actor_id != actor.pk or previous.detail.get('order') != str(order.pk) or previous.detail.get('preview') != preview:
+            raise ValidationError('이미 사용한 추가 요청번호입니다.')
+        return order
+    current = plan_supplement(order.pk)
+    if current != preview:
+        raise ValidationError('재고 또는 기존 배정이 변경되었습니다. 추가 피킹 미리보기를 다시 확인하세요.')
+    if not current['allocations']:
+        raise ValidationError('추가 예약할 입고 완료 재고가 없습니다.')
+    if current['shortages'] and not allow_shortage:
+        raise ValidationError('남은 부족 수량을 확인하고 부분 추가 배정에 동의하세요.')
+    ids = []
+    for row in current['allocations']:
+        stock = Stock.objects.select_for_update().get(pk=row['stock_id'])
+        if stock.status != Stock.Status.RECEIVED or row['quantity'] > stock.available:
+            raise ValidationError('재고가 변경되었습니다. 추가 피킹 미리보기를 다시 확인하세요.')
+        stock.reserved += row['quantity']
+        stock.save(update_fields=['reserved'])
+        allocation = Allocation.objects.create(stock=stock, order=order, project=order.project,
+                                              quantity=row['quantity'], assigned_details=stock_details(stock))
+        ids.append(str(allocation.pk))
+        audit(actor, 'reserve', allocation.pk, stock=stock.pk, quantity=row['quantity'],
+              order=str(order.pk), code=row['code'], project=order.project, supplement=str(request_id))
+    audit(actor, 'picking_supplement', request_id, order=str(order.pk), project=order.project,
+          preview=preview, allocations=ids, quantity=sum(r['quantity'] for r in current['allocations']))
+    return order

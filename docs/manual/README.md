@@ -1,6 +1,6 @@
 # 선일일렉콤 신입사원 사용 매뉴얼
 
-작성일: 2026-11-01 / 기능 기준: 두 가지 권한 적용본
+작성일: 2026-11-01 / 기능 기준: 두 가지 권한·기존 주문 추가 피킹·PC 사양 표시 적용본
 
 - [인쇄·배포용 PDF ](SUNIL_ERP_Beginner_Manual.pdf)
 - [회사에 맞게 수정할 Word](SUNIL_ERP_Beginner_Manual.docx)
