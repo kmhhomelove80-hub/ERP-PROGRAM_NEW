@@ -79,10 +79,15 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
             for page in [phone,pc]:page.on('pageerror',lambda error:errors.append(str(error)))
             def login(page,username):
                 page.goto(base+'/login/')
+                page.wait_for_function("Array.from(document.querySelectorAll('.company-logo img')).every(img=>img.complete && img.naturalWidth>0)")
+                if username=='browser-mobile': page.screenshot(path=str(artifacts/'company-login.png'),full_page=True)
                 page.get_by_label('사용자 이름',exact=False).fill(username)
                 page.get_by_label('비밀번호',exact=False).fill(password)
                 page.get_by_role('button',name='로그인',exact=True).click()
                 page.wait_for_url(base+'/')
+                page.locator('header .company-logo img').wait_for()
+                page.wait_for_function("Array.from(document.querySelectorAll('.company-logo img')).every(img=>img.complete && img.naturalWidth>0)")
+                if username=='browser-mobile': page.screenshot(path=str(artifacts/'company-logo-home.png'))
             login(phone,'browser-mobile')
             assert phone.locator('.stock-row summary').get_by_text('DEMO-LAMP-001',exact=True).count()==1
             assert not phone.locator('.stock-row').first.get_attribute('open')
@@ -166,8 +171,8 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
             assert phone.get_by_role('heading',name='할당 프로젝트 확인',exact=True).is_visible()
             assert phone.get_by_text('검증용 호선',exact=True).is_visible()
             assert phone.locator('.movement-cards').get_by_text('4개',exact=True).is_visible()
-            assert phone.evaluate('document.documentElement.scrollWidth <= innerWidth')
             phone.screenshot(path=str(artifacts/'mobile-allocation-projects.png'),full_page=True)
+            assert phone.evaluate('document.documentElement.scrollWidth <= innerWidth'), phone.evaluate("Array.from(document.querySelectorAll('*')).filter(e=>e.getBoundingClientRect().right>innerWidth).map(e=>[e.tagName,e.className,e.getBoundingClientRect().right])")
             phone.get_by_role('link',name='재고 조회로',exact=True).click()
             phone.locator('.stock-row summary').first.click()
             phone.get_by_role('link',name='이 재고 이동 요청',exact=True).click()
@@ -305,7 +310,7 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
             assert book.active['H2'].value==2
             book.close()
             assert not errors,errors
-            report={'erp_12_char_symbols_single_line_320_to_844':True,'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
+            report={'company_logo_loaded_login_and_header':True,'erp_12_char_symbols_single_line_320_to_844':True,'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
             (artifacts/'result.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
             print(json.dumps(report,ensure_ascii=False,indent=2))
             browser.close()

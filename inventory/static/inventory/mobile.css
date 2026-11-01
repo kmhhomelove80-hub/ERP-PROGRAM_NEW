@@ -88,3 +88,18 @@
  .stock-overview{padding:8px!important;margin:8px 0!important}
  .stock-overview>small{margin-top:4px}
 }
+
+/* Original company artwork, presented through its existing white margins. */
+.company-brand{display:inline-flex;align-items:center;flex-shrink:0}
+.company-logo{display:block;position:relative;overflow:hidden;width:190px;height:44px;background:#fff;border-radius:6px}
+.company-logo img{position:absolute;left:50%;top:50%;width:106%;height:auto;max-width:none;transform:translate(-50%,-47%)}
+.login-entry{margin-inline:auto}
+.login-brand{text-align:center;padding:20px 12px 8px}
+.login-brand .company-logo{width:min(100%,300px);height:72px;margin-inline:auto}
+.login-brand p{color:#53657b;font-size:14px;margin:10px 0}
+@media screen and (max-width:900px){
+ header .company-brand{min-width:0;justify-self:start}
+ header .company-logo{width:174px;height:40px}
+ .login-brand{padding-top:24px}
+ .login-brand .company-logo{width:min(100%,280px);height:66px}
+}
