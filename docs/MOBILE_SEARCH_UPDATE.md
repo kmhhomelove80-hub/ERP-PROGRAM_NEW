@@ -13,3 +13,11 @@
 브라우저 검증: `python3 scripts/smoke_browser.py --artifacts /tmp/sunil-updated-browser` (Playwright 설치된 Python 및 Chromium 필요).
 
 이전 GitHub 자동 검사 실패 로그는 확보하지 못했으며 원인/해결 여부는 확인되지 않았다. 현재 업로드본에는 Git 메타데이터가 없고 별도의 ERP-PROGRAM_NEW checkout도 비어 있다. 원격 게시/CI 검증은 별도다.
+
+## 사진 기준 목록 및 카메라 호환 개선
+
+휴대폰 표의 열 순서는 ITEM No. / 잔량(현재고−allocated) / Location / allocated / HULL이다. HULL에는 현재 예약 상태인 호선/프로젝트와 수량만 표시한다. 여러 위치는 행을 구분하며 행 펼침으로 상세와 이동 요청을 사용한다. 좁은 휴대폰에서는 표 영역을 가로 스크롤해 HULL까지 확인한다.
+
+ZXing library 0.21.3(공식 npm SHA512 검증, Apache-2.0 라이선스 동봉)을 정적 파일로 포함했다. 외부 CDN 연결 없이 네이티브 BarcodeDetector 미지원 브라우저에서 QR/바코드 프레임을 해독한다. 네이티브 인식 결과가 없는 프레임도 로컬 디코더로 확인한다. 실시간 촬영은 HTTPS/localhost 및 카메라 권한이 필요하다. 휴대폰에서 HTTP LAN 주소로 접속하면 브라우저가 실시간 카메라를 막을 수 있으며, 이 경우 사진 촬영/이미지 선택 기능을 사용한다. 사진은 브라우저 안에서 해독하며 서버에 업로드하지 않는다.
+
+검증: Django 157개 중 152개 통과, PostgreSQL 전용 5개 제외. 마이그레이션 변경 없음. Chromium 모바일·PC 업무 흐름 및 실제 QR 이미지의 사진 인식 통과. 실시간 카메라 성공/거부와 HTTP 안내는 모의 검증이며 실제 사용자 휴대폰의 촬영은 미검증이다.

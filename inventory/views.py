@@ -18,6 +18,12 @@ def stock_list(request):
     if status in Stock.Status.values: stocks = stocks.filter(status=status)
     totals = stocks.aggregate(quantity=Sum('quantity'),reserved=Sum('reserved'))
     page=Paginator(stocks,50).get_page(request.GET.get('page'))
+    from .models import Allocation
+    from django.db.models import Prefetch
+    from django.db.models.query import prefetch_related_objects
+    prefetch_related_objects(page.object_list, Prefetch('allocation_set', queryset=Allocation.objects.filter(state='reserved').order_by('project', 'pk'), to_attr='active_allocations'))
+    for stock in page.object_list:
+        stock.hull_summary = ' / '.join(f'{row.project} ({row.quantity})' for row in stock.active_allocations)
     from .reconciliation import latest_reference
     reference,erp_snapshot=latest_reference('Y09',[s.item.code for s in page.object_list])
     for stock in page.object_list:stock.erp_pending=reference.get(stock.item.code,{}).get('shipping_pending')

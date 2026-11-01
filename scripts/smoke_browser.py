@@ -97,10 +97,11 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
                 assert not phone.locator('.desktop-stock-table').is_visible()
             phone.set_viewport_size({'width':390,'height':844})
             # Exercise unsupported, denied, and successful camera paths with mocks.
-            phone.evaluate("window.BarcodeDetector = undefined")
+            phone.evaluate("Object.defineProperty(window, 'isSecureContext', {configurable:true, value:false})")
             phone.locator('#scan-open').click()
-            assert phone.locator('#scan-status').get_by_text('이 환경에서는 카메라 검색을 지원하지 않습니다.',exact=False).is_visible()
+            assert phone.locator('#scan-status').get_by_text('현재 접속에서는 실시간 카메라를 사용할 수 없습니다.',exact=False).is_visible()
             phone.locator('#scan-close').click()
+            phone.evaluate("Object.defineProperty(window, 'isSecureContext', {configurable:true, value:true})")
             phone.evaluate("""() => {
                 window.BarcodeDetector = class {
                     static async getSupportedFormats() { return ['qr_code', 'code_128']; }
@@ -111,6 +112,28 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
             phone.locator('#scan-open').click()
             phone.wait_for_function("document.querySelector('#scan-status').textContent.includes('카메라를 시작하지 못했습니다')")
             phone.locator('#scan-close').click()
+            # Decode a real QR image with the bundled decoder, without BarcodeDetector.
+            import base64
+            qr = phone.evaluate("""() => {
+                const matrix = new ZXing.QRCodeWriter().encode('DEMO-LAMP-001', ZXing.BarcodeFormat.QR_CODE, 360, 360, new Map());
+                const c = document.createElement('canvas'); c.width=360; c.height=360;
+                const ctx=c.getContext('2d'); ctx.fillStyle='white'; ctx.fillRect(0,0,360,360);
+                ctx.fillStyle='black';
+                for(let y=0;y<360;y++) for(let x=0;x<360;x++) if(matrix.get(x,y)) ctx.fillRect(x,y,1,1);
+                return c.toDataURL('image/png').split(',')[1];
+            }""")
+            phone.evaluate("Object.defineProperty(window, 'isSecureContext', {configurable:true, value:false}); window.BarcodeDetector=undefined")
+            phone.locator('#scan-open').click()
+            phone.locator('#scan-photo').set_input_files({'name':'qr.png','mimeType':'image/png','buffer':base64.b64decode(qr)})
+            phone.wait_for_function("!document.querySelector('#scan-dialog').open")
+            assert phone.get_by_role('textbox',name='재고 검색',exact=True).input_value()=='DEMO-LAMP-001'
+            phone.evaluate("""() => {
+                Object.defineProperty(window, 'isSecureContext', {configurable:true, value:true});
+                window.BarcodeDetector = class {
+                    static async getSupportedFormats() { return ['qr_code']; }
+                    async detect() { return [{rawValue:'DEMO-LAMP-001'}]; }
+                };
+            }""")
             phone.evaluate("""() => {
                 window.scanStopped = false;
                 navigator.mediaDevices.getUserMedia = async () => ({getTracks: () => [{stop: () => {window.scanStopped = true;}}]});
@@ -253,7 +276,7 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
             assert book.active['H2'].value==2
             book.close()
             assert not errors,errors
-            report={'compact_expandable_stock_rows':True,'scanner_mock_success_denied_unsupported':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
+            report={'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
             (artifacts/'result.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
             print(json.dumps(report,ensure_ascii=False,indent=2))
             browser.close()

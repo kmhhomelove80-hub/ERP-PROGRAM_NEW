@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from .models import Item, Stock
+from .models import Item, Stock, Allocation
 
 
 class StockMobileSearchTests(TestCase):
@@ -26,7 +26,7 @@ class StockMobileSearchTests(TestCase):
     def test_rows_expand_with_full_details_and_correct_movement(self):
         response = self.client.get('/')
         self.assertContains(response, '<details class="stock-row">', count=2)
-        self.assertContains(response, '<summary>', count=2)
+        self.assertContains(response, '<summary aria-label=', count=2)
         self.assertContains(response, '24V')
         self.assertContains(response, f'/stock/{self.stock.pk}/move/', count=2)
         self.assertNotContains(response, f'/stock/{self.expected.pk}/move/')
@@ -48,3 +48,13 @@ class StockMobileSearchTests(TestCase):
         response = self.client.get('/', {'q': '<script>alert(1)</script>'})
         self.assertNotContains(response, '<script>alert(1)</script>')
         self.assertContains(response, '&lt;script&gt;')
+
+    def test_phone_headers_and_hull_only_show_active_reservations(self):
+        Allocation.objects.create(stock=self.stock, project='BLUE GRASS MARINER', quantity=2)
+        Allocation.objects.create(stock=self.stock, project='완료 호선', quantity=1, state='released')
+        response = self.client.get('/')
+        for header in ['ITEM No. ↑', '잔량', 'Location', 'allocated', 'HULL']:
+            self.assertContains(response, header)
+        self.assertContains(response, 'BLUE GRASS MARINER (2)')
+        self.assertNotContains(response, '완료 호선')
+        self.assertEqual(response.context['page_obj'][0].available, 7)

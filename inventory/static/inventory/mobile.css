@@ -70,3 +70,20 @@
  .stock-row-detail h2{font-size:17px;margin:4px 0 12px}
  .stock-row-detail .button{width:100%}
 }
+
+/* Photo reference: compact inventory grid, one location per row. */
+@media screen and (max-width:900px){
+ .mobile-stock-cards{overflow-x:auto;background:white;border-block:1px solid #ddd;border-radius:0}
+ .stock-row-heading,.stock-row>summary{grid-template-columns:minmax(110px,1.6fr) 48px minmax(68px,.8fr) 72px minmax(100px,1.8fr) 20px;gap:0;min-width:480px}
+ .stock-row-heading{padding:0;color:#222;font-size:13px;background:#fff;border-bottom:1px solid #ddd;min-height:40px}
+ .stock-row-heading>span{padding:10px 8px;border-right:1px solid #eee;text-align:left!important;white-space:nowrap}
+ .stock-row{margin:0;border:0;border-bottom:1px solid #ddd;border-radius:0}
+ .stock-row>summary{padding:0;min-height:44px;border-radius:0;font-size:13px;color:#333}
+ .stock-row>summary>span{padding:12px 8px;text-align:left!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+ .stock-chevron{font-size:24px;font-weight:bold;padding:4px!important}
+ .stock-row[open]>summary{border-radius:0;background:#edf4ff}
+ .stock-row[open] .stock-chevron{transform:rotate(90deg)}
+ .stock-row-detail{position:sticky;left:0;width:calc(100vw - 24px);max-width:100%;background:#fff}
+ .stock-overview{padding:8px!important;margin:8px 0!important}
+ .stock-overview>small{margin-top:4px}
+}
