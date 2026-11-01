@@ -298,7 +298,7 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
             assert '30' in pc.locator('tr.shortage').text_content()
             pc.screenshot(path=str(artifacts/'desktop-shortage.png'),full_page=True)
             pc.goto(base+'/receipts/new/')
-            pc.get_by_label('품목',exact=False).select_option(label='DEMO-LAMP-001')
+            pc.locator('select[name=item]').select_option(label='DEMO-LAMP-001')
             pc.get_by_label('입고 구분',exact=False).select_option('received')
             pc.get_by_label('수량',exact=False).fill('2')
             pc.get_by_label('실제 위치 / 예정 재고 식별자',exact=False).fill('D0404')
@@ -412,6 +412,31 @@ print(order.pk)
             assert pc.get_by_text('요청 수량과 일치',exact=False).is_visible()
             assert pc.get_by_role('link',name='미배정 물량 추가 피킹',exact=True).count()==0
             pc.screenshot(path=str(artifacts/'picking-supplement-complete.png'),full_page=True)
+            # Register a completely new ERP item and its receipt on the same screen.
+            pc.goto(base+'/receipts/new/')
+            assert pc.get_by_role('radio',name='기존 품목',exact=True).is_checked()
+            assert pc.locator('#receipt-existing').is_visible()
+            assert not pc.locator('#receipt-new').is_visible()
+            pc.get_by_role('radio',name='신규 품목',exact=True).check()
+            assert not pc.locator('#receipt-existing').is_visible()
+            assert pc.locator('#receipt-existing select').is_disabled()
+            pc.get_by_label('신규 ERP 코드',exact=False).fill('NEW-RECEIPT1')
+            pc.get_by_label('품목명 / 모델명',exact=False).fill('신규 입고 테스트')
+            pc.get_by_label('사양',exact=False).fill('AC220V / IP67 / 신규 자재 사양')
+            pc.get_by_role('radio',name='기존 품목',exact=True).check()
+            assert pc.locator('#receipt-new input[name=new_code]').is_disabled()
+            pc.get_by_role('radio',name='신규 품목',exact=True).check()
+            assert pc.get_by_label('신규 ERP 코드',exact=False).input_value()=='NEW-RECEIPT1'
+            pc.get_by_label('입고 구분',exact=False).select_option('received')
+            pc.get_by_label('수량',exact=False).fill('7')
+            pc.get_by_label('실제 위치 / 예정 재고 식별자',exact=False).fill('NEW01')
+            pc.screenshot(path=str(artifacts/'new-item-receipt.png'),full_page=True)
+            pc.get_by_role('button',name='확인 후 반영',exact=True).click()
+            pc.wait_for_url(base+'/')
+            pc.goto(base+'/?q=NEW-RECEIPT1')
+            assert pc.locator('.desktop-stock-table .stock-spec').inner_text()=='AC220V / IP67 / 신규 자재 사양'
+            pc.goto(base+'/receipts/new/')
+            assert pc.locator('select[name=item] option').filter(has_text='NEW-RECEIPT1').count()==1
             reader_context=browser.new_context(viewport={'width':1440,'height':1000})
             reader_page=reader_context.new_page()
             reader_page.on('pageerror',lambda error:errors.append(str(error)))
@@ -435,7 +460,7 @@ print(order.pk)
                 assert pc.locator(f'[name="{name}"]').count()==0
             pc.screenshot(path=str(artifacts/'simple-user-permissions.png'),full_page=True)
             assert not errors,errors
-            report={'actual_code128_photo_local_decoder':True,'phone_scan_icon_desktop_hidden_photo_picker_return':True,'desktop_single_line_specifications_with_table_scroll':True,'same_order_80_released_20_supplemented':True,'two_roles_simple_admin_and_reader_no_mutation_controls':True,'mobile_all_headers_toggle_numeric_sort_and_search_preserves_order':True,'ime_search_before_blur_compositionend':True,'phone_search_and_rows_only_desktop_controls_preserved':True,'company_logo_loaded_login_and_header':True,'erp_12_char_symbols_single_line_320_to_844':True,'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
+            report={'existing_new_item_selection_and_atomic_receipt_ui':True,'actual_code128_photo_local_decoder':True,'phone_scan_icon_desktop_hidden_photo_picker_return':True,'desktop_single_line_specifications_with_table_scroll':True,'same_order_80_released_20_supplemented':True,'two_roles_simple_admin_and_reader_no_mutation_controls':True,'mobile_all_headers_toggle_numeric_sort_and_search_preserves_order':True,'ime_search_before_blur_compositionend':True,'phone_search_and_rows_only_desktop_controls_preserved':True,'company_logo_loaded_login_and_header':True,'erp_12_char_symbols_single_line_320_to_844':True,'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
             (artifacts/'result.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
             print(json.dumps(report,ensure_ascii=False,indent=2))
             browser.close()

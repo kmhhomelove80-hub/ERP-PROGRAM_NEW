@@ -133,3 +133,38 @@ class PostgreSQLSupplementConcurrencyTests(TransactionTestCase):
         self.new.refresh_from_db()
         self.assertEqual(self.new.reserved,20)
         self.assertEqual(self.order.allocations.count(),2)
+
+
+@skipUnless(connection.vendor == 'postgresql','실제 PostgreSQL에서만 동시성 검증')
+class PostgreSQLNewItemReceiptConcurrencyTests(TransactionTestCase):
+    parallel = PostgreSQLConcurrencyTests.parallel
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user('new-item-concurrent', is_staff=True)
+
+    def attempt(self, request_id):
+        from .services import register_receipt
+        try:
+            register_receipt(item_mode='new',new_code='NEW-RACE001',new_name='동시 신규',new_specification='IP67',
+                             location='NEW',quantity=3,status='received',expected_date=None,sender='',
+                             request_id=request_id,actor=self.user)
+            return 'ok'
+        except ValidationError:
+            return 'duplicate'
+
+    def test_same_new_item_request_only_receives_once(self):
+        import uuid
+        from .models import Receipt
+        request_id = uuid.uuid4()
+        self.assertEqual(self.parallel([lambda: self.attempt(request_id)]*2), ['ok','ok'])
+        self.assertEqual(Item.objects.count(),1)
+        self.assertEqual(Receipt.objects.count(),1)
+        self.assertEqual(Stock.objects.get().quantity,3)
+
+    def test_two_requests_cannot_create_same_new_code_twice(self):
+        import uuid
+        from .models import Receipt
+        self.assertCountEqual(self.parallel([lambda: self.attempt(uuid.uuid4())]*2), ['ok','duplicate'])
+        self.assertEqual(Item.objects.count(),1)
+        self.assertEqual(Receipt.objects.count(),1)
+        self.assertEqual(Stock.objects.get().quantity,3)

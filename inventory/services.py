@@ -188,3 +188,46 @@ def cancel_receipt(*, receipt_id, reason, actor):
     receipt.save(update_fields=['cancelled_at','cancelled_by','cancellation_reason'])
     audit(actor,'receipt_cancel',receipt.pk,code=stock.item.code,quantity=receipt.quantity,location=stock.location,reason=reason,before=before,after=stock.quantity)
     return receipt
+
+
+@warehouse_transaction
+def register_receipt(*, item_mode, item_id=None, new_code='', new_name='', new_specification='',
+                     location, quantity, status, expected_date, sender, request_id, actor):
+    """Create a new item and receipt as one transaction, including retry protection."""
+    from .models import Item, Receipt
+    if not actor.is_active or not actor.is_staff:
+        raise ValidationError('모든 권한 계정만 입고를 등록할 수 있습니다.')
+    if item_mode == 'existing':
+        if not Item.objects.filter(pk=item_id).exists():
+            raise ValidationError('기존 품목을 선택하세요.')
+        return receive_stock(item_id=item_id, location=location, quantity=quantity, status=status,
+                             expected_date=expected_date, sender=sender, request_id=request_id, actor=actor)
+    if item_mode != 'new':
+        raise ValidationError('기존 품목 또는 신규 품목을 선택하세요.')
+    require_quantity(quantity)
+    if not all(isinstance(value,str) for value in (new_code,new_name,new_specification)):
+        raise ValidationError('신규 품목 정보를 확인하세요.')
+    code, name, specification = new_code.strip(), new_name.strip(), new_specification.strip()
+    if (not code or len(code)>100 or code.startswith(('=','#'))
+            or any(char.isspace() or ord(char)<32 for char in code)):
+        raise ValidationError('ERP 코드는 공백 없이 1~100자로 입력하세요. = 또는 #으로 시작할 수 없습니다.')
+    if not name or len(name)>250 or len(specification)>10000:
+        raise ValidationError('신규 품목명(1~250자)과 사양(최대 10,000자)을 확인하세요.')
+    metadata = {'code':code, 'name':name, 'specification':specification}
+    previous = Receipt.objects.select_related('stock').filter(request_id=request_id).first()
+    if previous:
+        expected = dict(item_id=previous.stock.item_id,location=location.strip(),quantity=quantity,
+                        status=status,expected_date=expected_date.isoformat() if expected_date else None,
+                        sender=sender.strip(),new_item=metadata)
+        if previous.actor_id != actor.pk or previous.payload != expected:
+            raise ValidationError('이미 사용한 요청번호입니다.')
+        return previous
+    if Item.objects.filter(code__iexact=code).exists():
+        raise ValidationError('이미 등록된 ERP 코드입니다. 기존 품목을 선택해 입고하세요.')
+    item = Item.objects.create(code=code, name=name, specification=specification)
+    receipt = receive_stock(item_id=item.pk, location=location, quantity=quantity, status=status,
+                            expected_date=expected_date, sender=sender, request_id=request_id, actor=actor)
+    receipt.payload = {**receipt.payload, 'new_item':metadata}
+    receipt.save(update_fields=['payload'])
+    audit(actor,'item_created',item.pk,code=code,name=name,specification=specification,receipt=str(receipt.pk))
+    return receipt

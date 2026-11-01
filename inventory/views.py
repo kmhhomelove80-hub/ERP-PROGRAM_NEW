@@ -57,12 +57,15 @@ def receipt_create(request):
     if request.method == 'POST' and form.is_valid():
         d = form.cleaned_data
         try:
-            receive_stock(item_id=d['item'].pk,location=d['location'],quantity=d['quantity'],status=d['status'],expected_date=d['expected_date'],sender=d['sender'],request_id=d['request_id'],actor=request.user)
+            from .services import register_receipt
+            register_receipt(item_mode=d['item_mode'],item_id=d['item'].pk if d.get('item') else None,
+                             new_code=d.get('new_code',''),new_name=d.get('new_name',''),new_specification=d.get('new_specification',''),
+                             location=d['location'],quantity=d['quantity'],status=d['status'],expected_date=d['expected_date'],sender=d['sender'],request_id=d['request_id'],actor=request.user)
         except ValidationError as error: form.add_error(None,error)
         else:
             messages.success(request,'입고 등록이 완료되었습니다.')
             return redirect('stock-list')
-    return render(request,'inventory/form.html',{'form':form,'title':'입고 / 예정 재고 등록','description':'새 물량을 등록합니다. 이미 등록한 예정 물량이 도착했다면 재고 목록의 입고 확인을 사용하세요.'})
+    return render(request,'inventory/receipt_create.html',{'form':form,'title':'입고 / 예정 재고 등록','description':'새 물량을 등록합니다. 이미 등록한 예정 물량이 도착했다면 재고 목록의 입고 확인을 사용하세요.'})
 
 @warehouse_access
 def arrival_confirm(request, pk):

@@ -142,3 +142,9 @@
 @media screen and (max-width:900px){
  #stock-filter #scan-open{display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;min-height:46px;padding:8px;grid-column:2;grid-row:1}
 }
+
+.receipt-mode{border:1px solid #dee3ec;border-radius:8px;padding:8px 12px;margin-bottom:14px}
+.receipt-mode legend{font-weight:600;padding:0 6px}
+.receipt-mode #id_item_mode{display:flex;gap:20px;flex-wrap:wrap}
+.receipt-mode label{display:flex;align-items:center;gap:8px;margin:4px 0;min-height:40px}
+.entry .receipt-mode input[type=radio]{width:20px!important;height:20px;min-height:20px;flex:none;padding:0}

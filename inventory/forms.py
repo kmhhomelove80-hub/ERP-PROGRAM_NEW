@@ -4,14 +4,35 @@ from .models import Item, Stock, Receipt
 
 class ReceiptForm(forms.Form):
     request_id = forms.UUIDField(widget=forms.HiddenInput, initial=uuid.uuid4)
-    item = forms.ModelChoiceField(label='품목', queryset=Item.objects.order_by('code'))
+    item_mode = forms.ChoiceField(label='품목 구분', choices=[('existing','기존 품목'),('new','신규 품목')], initial='existing', widget=forms.RadioSelect)
+    item = forms.ModelChoiceField(label='기존 품목', queryset=Item.objects.order_by('code'), required=False)
+    new_code = forms.CharField(label='신규 ERP 코드', max_length=100, required=False, help_text='회사 ERP의 코드를 그대로 입력하세요. -와 * 등의 기호를 보존합니다.')
+    new_name = forms.CharField(label='품목명 / 모델명', max_length=250, required=False)
+    new_specification = forms.CharField(label='사양', max_length=10000, required=False, widget=forms.Textarea(attrs={'rows':3}))
     status = forms.ChoiceField(label='입고 구분', choices=Stock.Status.choices)
     quantity = forms.IntegerField(label='수량', min_value=1, max_value=2147483647)
     location = forms.CharField(label='실제 위치 / 예정 재고 식별자', max_length=150)
     expected_date = forms.DateField(label='예정일', required=False, widget=forms.DateInput(attrs={'type':'date'}))
     sender = forms.CharField(label='발송 담당자',max_length=100,required=False)
+    def __init__(self, data=None, *args, **kwargs):
+        if data is not None:
+            data = data.copy()
+            # Preserve submissions from the earlier existing-item form.
+            if 'item_mode' not in data:
+                data['item_mode'] = 'existing'
+            irrelevant = ['item'] if data.get('item_mode') == 'new' else ['new_code','new_name','new_specification']
+            for key in irrelevant:
+                data.pop(key, None)
+        super().__init__(data, *args, **kwargs)
+
     def clean(self):
         data = super().clean()
+        if data.get('item_mode') == 'existing' and not data.get('item'):
+            self.add_error('item','기존 품목을 선택하세요.')
+        if data.get('item_mode') == 'new':
+            for key in ['new_code','new_name']:
+                if not data.get(key):
+                    self.add_error(key,'신규 품목에는 필수입니다.')
         if data.get('status') == Stock.Status.EXPECTED:
             for key in ['expected_date','sender']:
                 if not data.get(key): self.add_error(key,'예정 재고에는 필수입니다.')
@@ -81,7 +102,7 @@ class MovementProcessForm(forms.Form):
 
 class HistoryFilterForm(forms.Form):
     q = forms.CharField(label='검색',required=False,max_length=100)
-    action = forms.ChoiceField(label='작업 종류',required=False,choices=[('','전체'),('initial_import','초기 이관'),('receipt','입고'),('receipt_batch','일괄 입고'),('substitution_reserved','대체 예약'),('substitution_dispatch','대체 출고(빌림)'),('substitution_settlement','입고분 상환'),('substitution_cancel','대체 예약 취소'),('substitution_erp','회사 ERP 정산 확인'),('receipt_cancel','입고 취소'),('arrival','도착 확인'),('reserve','예약'),('cancel','예약 취소'),('release','출고 확정'),('picking_confirm','피킹 등록'),('picking_supplement','미배정 추가 피킹'),('movement_requested','이동 요청'),('movement','이동 처리'),('erp_snapshot','ERP 대조 등록'),('reconciliation_review','차이 분석 기록'),('legacy_archive','과거 이력 보관 이관')])
+    action = forms.ChoiceField(label='작업 종류',required=False,choices=[('','전체'),('initial_import','초기 이관'),('receipt','입고'),('item_created','신규 품목 등록'),('receipt_batch','일괄 입고'),('substitution_reserved','대체 예약'),('substitution_dispatch','대체 출고(빌림)'),('substitution_settlement','입고분 상환'),('substitution_cancel','대체 예약 취소'),('substitution_erp','회사 ERP 정산 확인'),('receipt_cancel','입고 취소'),('arrival','도착 확인'),('reserve','예약'),('cancel','예약 취소'),('release','출고 확정'),('picking_confirm','피킹 등록'),('picking_supplement','미배정 추가 피킹'),('movement_requested','이동 요청'),('movement','이동 처리'),('erp_snapshot','ERP 대조 등록'),('reconciliation_review','차이 분석 기록'),('legacy_archive','과거 이력 보관 이관')])
     start = forms.DateField(label='시작일',required=False,widget=forms.DateInput(attrs={'type':'date'}))
     end = forms.DateField(label='종료일',required=False,widget=forms.DateInput(attrs={'type':'date'}))
     def clean(self):
