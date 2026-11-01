@@ -69,5 +69,5 @@ class ReceivingTests(TestCase):
     def test_viewer_cannot_modify(self):
         viewer = get_user_model().objects.create_user('viewer')
         self.client.force_login(viewer)
-        self.assertEqual(self.client.post(reverse('receipt-create'),{}).status_code,302)
+        self.assertEqual(self.client.post(reverse('receipt-create'),{}).status_code,403)
         self.assertFalse(Receipt.objects.exists())

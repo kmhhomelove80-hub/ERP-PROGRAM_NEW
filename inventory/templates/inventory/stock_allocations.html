@@ -1,5 +1,5 @@
 {% extends 'inventory/base.html' %}{% block content %}
-<h1>할당 프로젝트 확인</h1><p><a href="{% url 'stock-list' %}?q={{ stock.item.code|urlencode }}">재고 조회로</a>{% if stock.status == 'received' and stock.available > 0 %} · <a href="{% url 'movement-create' stock.pk %}">가용 재고 이동 요청</a>{% endif %}</p>
+<h1>할당 프로젝트 확인</h1><p><a href="{% url 'stock-list' %}?q={{ stock.item.code|urlencode }}">재고 조회로</a>{% if user.is_staff and stock.status == 'received' and stock.available > 0 %} · <a href="{% url 'movement-create' stock.pk %}">가용 재고 이동 요청</a>{% endif %}</p>
 <div class="card"><h2 style="font-size:18px;overflow-wrap:anywhere">{{ stock.item.code }}</h2><p>{{ stock.legacy_name|default:stock.item.name }}</p><p style="overflow-wrap:anywhere"><small>{{ stock.legacy_specification|default:stock.item.specification }}</small></p><dl class="facts"><dt>창고 / 위치</dt><dd>{{ stock.warehouse }} / {{ stock.location }}</dd><dt>현재고 / 가용량</dt><dd>{{ stock.quantity }} / {{ stock.available }}</dd><dt>allocated</dt><dd><strong>{{ stock.reserved }}개</strong></dd><dt>전체 할당 합계</dt><dd>{{ allocated_total }}개 · {{ page_obj.paginator.count }}행</dd></dl></div>
 {% if not matches %}<p class="notice">원장 allocated와 할당 합계가 다릅니다. PC 관리자에게 확인을 요청하세요. 이 화면에서는 수량을 수정하지 않습니다.</p>{% endif %}
 <p><small>이 위치에 현재 예약된 프로젝트입니다. 출고 완료·취소·이미 나간 대체품은 현재 allocated에 포함하지 않습니다.</small></p>

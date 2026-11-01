@@ -68,7 +68,7 @@ class ReadinessTests(TestCase):
         self.assertTrue(readiness_report()['ready'])
     def test_staff_dashboard_and_viewer_restriction(self):
         viewer=get_user_model().objects.create_user('viewer')
-        self.client.force_login(viewer);self.assertEqual(self.client.get('/operations/').status_code,302)
+        self.client.force_login(viewer);self.assertEqual(self.client.get('/operations/').status_code,200)
         viewer.is_staff=True;viewer.save()
         self.assertContains(self.client.get('/operations/'),'예약 수량 대조')
     def test_missing_expected_date_is_warning(self):

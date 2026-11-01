@@ -74,9 +74,9 @@ class HistoryIntegrityTests(TestCase):
         request.refresh_from_db();self.stock.refresh_from_db()
         self.assertEqual((request.state,self.stock.quantity),('rejected',10))
 
-    def test_mobile_user_cannot_view_pc_picking_history(self):
+    def test_viewer_can_read_picking_history(self):
         order=self.order()
         viewer=get_user_model().objects.create_user('mobile-only')
         self.client.force_login(viewer)
         for url in [f'/picking/{order.pk}/','/picking/','/allocation-history/']:
-            self.assertEqual(self.client.get(url).status_code,302)
+            self.assertEqual(self.client.get(url).status_code,200)

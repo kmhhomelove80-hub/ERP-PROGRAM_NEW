@@ -217,8 +217,8 @@ class ImprovementWorkflowTests(TestCase):
         self.assertFalse(Allocation.objects.filter(state='released').exists())
         first.refresh_from_db();self.assertEqual(first.state,'reserved')
 
-    def test_nonstaff_cannot_use_bulk_customer_print_or_erp(self):
+    def test_viewer_can_explore_bulk_customer_print_and_erp(self):
         order=self.customer_order()
         self.client.force_login(self.mobile)
         for url in ['/receipts/bulk/','/erp/upload/',f'/picking/{order.pk}/customer/','/allocations/']:
-            self.assertEqual(self.client.get(url).status_code,302)
+            self.assertEqual(self.client.get(url).status_code,200)

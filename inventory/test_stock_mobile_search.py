@@ -5,7 +5,7 @@ from .models import Item, Stock, Allocation
 
 class StockMobileSearchTests(TestCase):
     def setUp(self):
-        self.user = get_user_model().objects.create_user('scan-user')
+        self.user = get_user_model().objects.create_user('scan-user', is_staff=True)
         self.client.force_login(self.user)
         self.item = Item.objects.create(code='8801234567890', name='조명', specification='24V')
         self.stock = Stock.objects.create(item=self.item, location='A-01', quantity=9, reserved=2)

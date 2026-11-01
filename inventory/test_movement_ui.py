@@ -63,6 +63,7 @@ class MovementUITests(TestCase):
         self.assertEqual((request.state,self.source.quantity),('pending',20))
         self.assertEqual(Stock.objects.count(),1)
     def test_mobile_web_request_and_admin_processing_preserve_total(self):
+        self.owner.is_staff=True;self.owner.save()
         self.client.force_login(self.owner)
         create=reverse('movement-create',args=[self.source.pk])
         self.assertContains(self.client.get(create),'현재 위치')
@@ -71,6 +72,7 @@ class MovementUITests(TestCase):
         self.assertEqual(self.client.post(create,self.payload()).status_code,302)
         self.assertEqual(MovementRequest.objects.count(),1)
         detail=response.url
+        self.client.force_login(self.other)
         self.assertEqual(self.client.post(detail,dict(action='process',confirmed='on')).status_code,403)
         self.client.force_login(self.admin)
         response=self.client.post(detail,dict(action='process',confirmed='on'))
@@ -80,14 +82,15 @@ class MovementUITests(TestCase):
         self.assertEqual(Stock.objects.get(location='B02').quantity,5)
         self.client.post(detail,dict(action='process',confirmed='on'))
         self.assertEqual(Stock.objects.get(location='B02').quantity,5)
-    def test_list_and_detail_do_not_expose_other_users_requests(self):
+    def test_viewer_can_read_all_users_requests(self):
         request=self.submit()
         self.client.force_login(self.other)
-        self.assertNotContains(self.client.get(reverse('movement-list')),'MOVE-CODE')
-        self.assertEqual(self.client.get(reverse('movement-detail',args=[request.pk])).status_code,403)
+        self.assertContains(self.client.get(reverse('movement-list')),'MOVE-CODE')
+        self.assertEqual(self.client.get(reverse('movement-detail',args=[request.pk])).status_code,200)
         self.client.force_login(self.admin)
         self.assertContains(self.client.get(reverse('movement-list')),'MOVE-CODE')
     def test_post_requires_csrf_and_confirmation(self):
+        self.owner.is_staff=True;self.owner.save()
         client=Client(enforce_csrf_checks=True);client.force_login(self.owner)
         url=reverse('movement-create',args=[self.source.pk])
         self.assertEqual(client.post(url,self.payload()).status_code,403)
@@ -106,7 +109,7 @@ class MovementUITests(TestCase):
         event=AuditEvent.objects.get(action='movement')
         AuditEvent.objects.filter(pk=event.pk).update(created_at=datetime(2026,10,30,23,30,tzinfo=datetime_timezone.utc))
         self.client.force_login(self.owner)
-        self.assertEqual(self.client.get(reverse('history-list')).status_code,302)
+        self.assertEqual(self.client.get(reverse('history-list')).status_code,200)
         self.client.force_login(self.admin)
         response=self.client.get(reverse('history-list'),dict(q='확인중',action='movement',start='2026-10-31',end='2026-10-31'))
         self.assertContains(response,'위치 확인중')

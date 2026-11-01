@@ -32,10 +32,10 @@ class ExcelExportTests(TestCase):
         self.assertEqual(exported['EXPORT1'][7],11)
         self.assertIsNone(exported['OTHER'][3])
         book.close()
-    def test_viewer_cannot_export_bulk_inventory(self):
+    def test_viewer_can_read_inventory_export(self):
         viewer=get_user_model().objects.create_user('mobile')
         self.client.force_login(viewer)
-        self.assertEqual(self.client.get('/stock/export/').status_code,302)
+        self.assertEqual(self.client.get('/stock/export/').status_code,200)
 
     def test_oversized_export_returns_clear_error_instead_of_partial_file(self):
         from unittest.mock import patch

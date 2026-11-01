@@ -234,7 +234,7 @@ class SubstitutionTests(TestCase):
         self.assertContains(self.client.get(url),'동일/수정 완료')
         self.client.force_login(self.mobile)
         for path in [url,'/substitutions/',f'/picking/{self.order.pk}/substitute/']:
-            self.assertEqual(self.client.get(path).status_code,302)
+            self.assertEqual(self.client.get(path).status_code,200)
 
     def test_readiness_and_normal_release_list_separate_substitutions(self):
         record=self.borrow()

@@ -5,6 +5,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q, Sum
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import Stock
+from .access import warehouse_access, warehouse_write
 from .forms import ReceiptForm, ArrivalForm
 from .services import receive_stock, confirm_arrival
 
@@ -50,7 +51,7 @@ def stock_list(request):
     for stock in page.object_list:stock.erp_pending=reference.get(stock.item.code,{}).get('shipping_pending')
     return render(request,'inventory/stock_results.html' if request.GET.get('partial')=='1' else 'inventory/stock_list.html',{'page_obj':page, 'query':query,'status':status,'totals':totals,'statuses':Stock.Status.choices,'erp_snapshot':erp_snapshot,'sort':sort,'direction':direction,'sort_headers':sort_headers})
 
-@user_passes_test(lambda user: user.is_active and user.is_staff)
+@warehouse_access
 def receipt_create(request):
     form = ReceiptForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
@@ -63,7 +64,7 @@ def receipt_create(request):
             return redirect('stock-list')
     return render(request,'inventory/form.html',{'form':form,'title':'입고 / 예정 재고 등록','description':'새 물량을 등록합니다. 이미 등록한 예정 물량이 도착했다면 재고 목록의 입고 확인을 사용하세요.'})
 
-@user_passes_test(lambda user: user.is_active and user.is_staff)
+@warehouse_access
 def arrival_confirm(request, pk):
     stock = get_object_or_404(Stock.objects.select_related('item'),pk=pk,status='expected',quantity__gt=0)
     form = ArrivalForm(request.POST or None)
@@ -75,7 +76,7 @@ def arrival_confirm(request, pk):
             return redirect('stock-list')
     return render(request,'inventory/form.html',{'form':form,'title':'예정 재고 도착 확인','description':f'{stock.item.code} · {stock.location} · 전량 {stock.quantity}개 / 예약 {stock.reserved}개를 실제 위치로 전환합니다.'})
 
-@user_passes_test(lambda user: user.is_active and user.is_staff)
+@warehouse_access
 def picking_create(request):
     from django.core import signing
     from .forms import PickingInputForm, PickingConfirmForm
@@ -113,7 +114,7 @@ def picking_create(request):
                 return redirect('picking-detail',pk=order.pk)
     return render(request,'inventory/picking_create.html',{'input_form':input_form,'preview':preview,'confirm_form':confirm_form,'totals':totals})
 
-@user_passes_test(lambda user:user.is_active and user.is_staff)
+@warehouse_access
 def picking_detail(request, pk):
     from .models import PickingOrder
     order = get_object_or_404(PickingOrder,pk=pk)
@@ -126,7 +127,7 @@ def picking_detail(request, pk):
         totals = order_totals(order, rows)
     return render(request,'inventory/picking_detail.html',{'order':order,'allocations':rows,'balance':balance,'totals':totals})
 
-@user_passes_test(lambda user: user.is_active and user.is_staff)
+@warehouse_access
 def allocation_list(request):
     from django.core import signing
     from .models import Allocation
@@ -165,7 +166,7 @@ def allocation_list(request):
     page=Paginator(rows,50).get_page(request.GET.get('page'))
     return render(request,'inventory/allocations.html',{'form':form,'allocations':page,'page_obj':page,'query':query,'seq':seq,'total':len(ids),'filter_token':token,'selected_ids':request.POST.getlist('allocations')})
 
-@login_required
+@warehouse_write
 def movement_create(request, pk):
     from .forms import MovementRequestForm
     from .services import submit_movement
@@ -186,7 +187,6 @@ def movement_list(request):
     status = request.GET.get('status','pending')
     query = request.GET.get('q','').strip()
     rows = MovementRequest.objects.select_related('source__item','requested_by','processed_by').order_by('-requested_at','pk')
-    if not request.user.is_staff: rows = rows.filter(requested_by=request.user)
     if status in ['pending','completed','rejected']: rows = rows.filter(state=status)
     else: status = ''
     if query: rows = rows.filter(Q(source__item__code__icontains=query)|Q(source__location__icontains=query)|Q(destination__icontains=query))
@@ -199,7 +199,6 @@ def movement_detail(request, pk):
     from .services import process_movement
     from django.core.exceptions import PermissionDenied
     movement = get_object_or_404(MovementRequest.objects.select_related('source__item','requested_by','processed_by'),pk=pk)
-    if not request.user.is_staff and movement.requested_by_id != request.user.pk: raise PermissionDenied
     form = MovementProcessForm(request.POST or None) if request.user.is_staff and movement.state=='pending' else None
     if request.method == 'POST':
         if not request.user.is_staff: raise PermissionDenied
@@ -213,7 +212,7 @@ def movement_detail(request, pk):
             return redirect('movement-detail',pk=movement.pk)
     return render(request,'inventory/movement_detail.html',{'movement':movement,'form':form})
 
-@user_passes_test(lambda user: user.is_active and user.is_staff)
+@warehouse_access
 def history_list(request):
     from .models import AuditEvent
     from .forms import HistoryFilterForm
@@ -236,7 +235,7 @@ def history_list(request):
     params = request.GET.copy();params.pop('page',None)
     return render(request,'inventory/history.html',{'page_obj':page,'form':form,'filter_query':params.urlencode()})
 
-@user_passes_test(lambda user: user.is_active and user.is_staff)
+@warehouse_access
 def erp_template(request):
     from django.http import HttpResponse
     from .reconciliation import template_bytes
@@ -244,7 +243,7 @@ def erp_template(request):
     response['Content-Disposition']='attachment; filename="ERP_stock_template.xlsx"'
     return response
 
-@user_passes_test(lambda user: user.is_active and user.is_staff)
+@warehouse_access
 def erp_upload(request):
     from django.core import signing
     from .forms import ErpUploadForm,ErpConfirmForm
@@ -280,13 +279,13 @@ def erp_upload(request):
                 return redirect('erp-detail',pk=snapshot.pk)
     return render(request,'inventory/erp_upload.html',{'form':upload_form,'preview':preview,'confirm_form':confirm_form})
 
-@user_passes_test(lambda user: user.is_active and user.is_staff)
+@warehouse_access
 def erp_list(request):
     from .models import ErpSnapshot
     rows=ErpSnapshot.objects.select_related('actor').order_by('-created_at','-pk')
     return render(request,'inventory/erp_list.html',{'page_obj':Paginator(rows,30).get_page(request.GET.get('page'))})
 
-@user_passes_test(lambda user: user.is_active and user.is_staff)
+@warehouse_access
 def erp_detail(request,pk):
     from .models import ErpSnapshot
     from django.db.models import F
@@ -308,7 +307,7 @@ def erp_detail(request,pk):
         for row in page.object_list:row.loan_summary=summaries.get(row.code)
     return render(request,'inventory/erp_detail.html',{'snapshot':snapshot,'page_obj':page,'warehouse':warehouse,'issues':issues,'query':query,'totals':totals})
 
-@user_passes_test(lambda user: user.is_active and user.is_staff)
+@warehouse_access
 def erp_review(request,pk):
     from .models import ReconciliationRow
     from .forms import ReviewForm
@@ -324,7 +323,7 @@ def erp_review(request,pk):
             return redirect('erp-detail',pk=row.snapshot_id)
     return render(request,'inventory/form.html',{'form':form,'title':f'{row.code} 차이 분석','description':f'ERP {row.erp_quantity if row.erp_quantity is not None else "누락"} / 관리 재고 {row.managed}. 원래 대조 수량은 보존되며, 조치 완료는 이 차이에 대한 업무 처리 상태입니다.'})
 
-@user_passes_test(lambda user:user.is_active and user.is_staff)
+@warehouse_access
 def archive_list(request):
     from .models import LegacyArchiveRecord
     rows=LegacyArchiveRecord.objects.select_related('batch').order_by('-batch_id','kind','-source_row')
@@ -337,7 +336,7 @@ def archive_list(request):
     for record in page.object_list:record.original_display=json.dumps(record.payload,ensure_ascii=False,indent=2)
     return render(request,'inventory/archives.html',{'page_obj':page,'kind':kind,'query':query,'kinds':LegacyArchiveRecord._meta.get_field('kind').choices})
 
-@user_passes_test(lambda user:user.is_active and user.is_staff)
+@warehouse_access
 def receipt_list(request):
     from .models import Receipt
     query=request.GET.get('q','').strip()
@@ -345,7 +344,7 @@ def receipt_list(request):
     if query:rows=rows.filter(Q(stock__item__code__icontains=query)|Q(stock__location__icontains=query))
     return render(request,'inventory/receipts.html',{'page_obj':Paginator(rows,50).get_page(request.GET.get('page')),'query':query})
 
-@user_passes_test(lambda user:user.is_active and user.is_staff)
+@warehouse_access
 def receipt_cancel(request,pk):
     from .models import Receipt
     from .forms import ReceiptCancelForm
@@ -360,13 +359,13 @@ def receipt_cancel(request,pk):
             return redirect('receipt-list')
     return render(request,'inventory/form.html',{'form':form,'title':'입고 원거래 취소','description':f'{receipt.stock.item.code} / {receipt.quantity}개 전량 취소. 현재 가용량 {receipt.stock.available}. 예약된 수량은 취소할 수 없으며, 예정→도착 전환 후에는 원거래 취소를 차단합니다.'})
 
-@user_passes_test(lambda user:user.is_active and user.is_staff)
+@warehouse_access
 def operations_status(request):
     from .readiness import readiness_report
     from django.conf import settings
     return render(request,'inventory/operations.html',{'report':readiness_report(deployment=not settings.DEBUG),'debug':settings.DEBUG})
 
-@user_passes_test(lambda user:user.is_active and user.is_staff)
+@warehouse_access
 def picking_list(request):
     from .models import PickingOrder
     from django.db.models import Count
@@ -381,7 +380,7 @@ def picking_list(request):
     else:status=''
     return render(request,'inventory/picking_list.html',{'page_obj':Paginator(rows,30).get_page(request.GET.get('page')),'query':query,'status':status})
 
-@user_passes_test(lambda user:user.is_active and user.is_staff)
+@warehouse_access
 def allocation_history(request):
     from .models import Allocation
     query=request.GET.get('q','').strip()
@@ -394,7 +393,7 @@ def allocation_history(request):
     else:status=''
     return render(request,'inventory/allocation_history.html',{'page_obj':Paginator(rows,50).get_page(request.GET.get('page')),'query':query,'status':status})
 
-@user_passes_test(lambda user:user.is_active and user.is_staff)
+@warehouse_access
 def stock_export(request):
     from django.http import HttpResponse
     from django.utils import timezone
@@ -413,7 +412,7 @@ def stock_export(request):
     response['Content-Disposition']=f'attachment; filename="stock_{timezone.localtime():%Y%m%d_%H%M}.xlsx"'
     return response
 
-@user_passes_test(lambda user:user.is_active and user.is_staff)
+@warehouse_access
 def erp_export(request,pk):
     from django.http import HttpResponse
     from django.db.models import F
@@ -437,7 +436,7 @@ def erp_export(request,pk):
     return response
 
 
-@user_passes_test(lambda user:user.is_active and user.is_staff)
+@warehouse_access
 def customer_picking_print(request, pk):
     from .models import PickingOrder
     from .customer_picking import customer_print_groups
@@ -450,7 +449,7 @@ def customer_picking_print(request, pk):
     return render(request,'inventory/customer_picking_print.html',{'order':order,'groups':groups,'totals':totals})
 
 
-@user_passes_test(lambda user:user.is_active and user.is_staff)
+@warehouse_access
 def receipt_bulk(request):
     from django.core import signing
     from .forms import BulkReceiptForm, ErpConfirmForm
@@ -486,7 +485,7 @@ def receipt_bulk(request):
     return render(request,'inventory/receipt_bulk.html',{'form':form,'preview':preview,'confirm_form':confirm_form,'warnings':locals().get('warnings',[])})
 
 
-@user_passes_test(lambda user:user.is_active and user.is_staff)
+@warehouse_access
 def substitution_create(request, pk):
     from .models import PickingOrder
     from .forms import SubstitutionForm
@@ -503,7 +502,7 @@ def substitution_create(request, pk):
     return render(request,'inventory/form.html',{'form':form,'title':f'{order.project} 대체품 배정','description':'현재 미배정 수량을 다른 코드로 1:1 배정합니다. 이 단계는 예약이며 실물 차감은 대체 출고(빌림) 때 수행합니다.'})
 
 
-@user_passes_test(lambda user:user.is_active and user.is_staff)
+@warehouse_access
 def substitution_detail(request, pk):
     from .models import Substitution
     from .forms import SubstitutionDispatchForm,SubstitutionSettlementForm,SubstitutionErpForm,SubstitutionCancelForm
@@ -532,7 +531,7 @@ def substitution_detail(request, pk):
     return render(request,'inventory/substitution_detail.html',{'record':record,'repaid':repaid,'outstanding':record.allocation.quantity-repaid,'dispatch_form':dispatch_form,'cancel_form':cancel_form,'settlement_form':settlement_form,'erp_form':erp_form,'settlements':record.settlements.select_related('receipt','actor').order_by('created_at','pk')})
 
 
-@user_passes_test(lambda user:user.is_active and user.is_staff)
+@warehouse_access
 def substitution_list(request):
     from .models import Substitution,ErpSnapshot
     from .substitutions import related_for_snapshot,repaid_quantity

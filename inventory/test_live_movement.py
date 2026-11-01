@@ -13,7 +13,7 @@ class LiveMovementTests(TestCase):
             MovementRequest.objects.create(id=uuid.uuid4(), source=stock, requested_by=user, quantity=1, destination=destination, state=state)
         self.client.force_login(self.user)
 
-    def test_partial_search_preserves_state_and_permissions(self):
+    def test_partial_search_preserves_state_and_all_request_read_access(self):
         response = self.client.get('/movements/', {'partial':'1', 'status':'completed', 'q':'B01'})
         self.assertContains(response, 'B01')
         self.assertNotContains(response, 'C01')
@@ -21,11 +21,11 @@ class LiveMovementTests(TestCase):
         self.assertNotContains(response, '<html')
         self.assertEqual(response.context['page_obj'].paginator.count, 1)
         response = self.client.get('/movements/', {'partial':'1', 'status':'completed', 'q':'SECRET'})
-        self.assertEqual(response.context['page_obj'].paginator.count, 0)
+        self.assertEqual(response.context['page_obj'].paginator.count, 1)
 
     def test_normal_page_and_empty_query_and_login(self):
         self.assertContains(self.client.get('/movements/'), 'data-live-filter')
         response = self.client.get('/movements/', {'partial':'1', 'status':'', 'q':''})
-        self.assertEqual(response.context['page_obj'].paginator.count, 2)
+        self.assertEqual(response.context['page_obj'].paginator.count, 3)
         self.client.logout()
         self.assertEqual(self.client.get('/movements/', {'partial':'1'}).status_code, 302)

@@ -85,7 +85,7 @@ class ReconciliationTests(TestCase):
         response=self.client.get(reverse('erp-template'));self.assertEqual(response.status_code,200)
         self.assertTrue(response.content.startswith(b'PK'))
         viewer=get_user_model().objects.create_user('viewer');self.client.force_login(viewer)
-        self.assertEqual(self.client.get(reverse('erp-list')).status_code,302)
+        self.assertEqual(self.client.get(reverse('erp-list')).status_code,200)
 
     def test_signed_company_erp_values_are_preserved_without_negative_physical_stock(self):
         plan=inspect_erp_file(self.file([['Y09','ERP1',-2,-3,'원본 음수']]),'standard')
