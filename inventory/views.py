@@ -13,8 +13,11 @@ from .services import receive_stock, confirm_arrival
 def stock_list(request):
     query = request.GET.get('q','').strip()
     status = request.GET.get('status','')
+    scan_mode = '1' if request.GET.get('scan') == '1' and query else ''
     stocks = Stock.objects.select_related('item').filter(quantity__gt=0).order_by('item__code','location','pk')
-    if query:
+    if scan_mode:
+        stocks = stocks.filter(item__code__iexact=query)
+    elif query:
         stocks = stocks.filter(Q(item__code__icontains=query)|Q(item__name__icontains=query)|Q(item__specification__icontains=query)|Q(location__icontains=query)|Q(legacy_name__icontains=query)|Q(legacy_specification__icontains=query))
     if status in Stock.Status.values: stocks = stocks.filter(status=status)
     # Sort the full filtered queryset before pagination; never accept SQL field names.
@@ -37,8 +40,11 @@ def stock_list(request):
         sort_headers.append({'label': label, 'key': key, 'active': active,
                              'arrow': '↑' if direction == 'asc' else '↓',
                              'aria': ('ascending' if direction == 'asc' else 'descending') if active else 'none',
-                             'url': '?' + urlencode({'q': query, 'status': status, 'sort': key, 'direction': next_direction})})
+                             'url': '?' + urlencode({'q': query, 'status': status, 'sort': key, 'direction': next_direction, 'scan': scan_mode})})
     totals = stocks.aggregate(quantity=Sum('quantity'),reserved=Sum('reserved'))
+    totals['available'] = (totals['quantity'] or 0) - (totals['reserved'] or 0)
+    from .models import Item
+    scan_item_exists = bool(scan_mode and Item.objects.filter(code__iexact=query).exists())
     page=Paginator(stocks,50).get_page(request.GET.get('page'))
     from .models import Allocation
     from django.db.models import Prefetch
@@ -49,7 +55,7 @@ def stock_list(request):
     from .reconciliation import latest_reference
     reference,erp_snapshot=latest_reference('Y09',[s.item.code for s in page.object_list])
     for stock in page.object_list:stock.erp_pending=reference.get(stock.item.code,{}).get('shipping_pending')
-    return render(request,'inventory/stock_results.html' if request.GET.get('partial')=='1' else 'inventory/stock_list.html',{'page_obj':page, 'query':query,'status':status,'totals':totals,'statuses':Stock.Status.choices,'erp_snapshot':erp_snapshot,'sort':sort,'direction':direction,'sort_headers':sort_headers})
+    return render(request,'inventory/stock_results.html' if request.GET.get('partial')=='1' else 'inventory/stock_list.html',{'page_obj':page, 'query':query,'status':status,'totals':totals,'statuses':Stock.Status.choices,'erp_snapshot':erp_snapshot,'sort':sort,'direction':direction,'sort_headers':sort_headers,'scan_mode':scan_mode,'scan_item_exists':scan_item_exists})
 
 @warehouse_access
 def receipt_create(request):
@@ -405,7 +411,8 @@ def stock_export(request):
     from .locking import warehouse_lock
     query=request.GET.get('q','').strip();status=request.GET.get('status','')
     rows=Stock.objects.select_related('item').filter(quantity__gt=0).order_by('item__code','location','pk')
-    if query:rows=rows.filter(Q(item__code__icontains=query)|Q(item__name__icontains=query)|Q(item__specification__icontains=query)|Q(location__icontains=query)|Q(legacy_name__icontains=query)|Q(legacy_specification__icontains=query))
+    if query and request.GET.get('scan') == '1':rows=rows.filter(item__code__iexact=query)
+    elif query:rows=rows.filter(Q(item__code__icontains=query)|Q(item__name__icontains=query)|Q(item__specification__icontains=query)|Q(location__icontains=query)|Q(legacy_name__icontains=query)|Q(legacy_specification__icontains=query))
     if status in Stock.Status.values:rows=rows.filter(status=status)
     with warehouse_lock():
         if rows.count()>MAX_EXPORT_ROWS:return HttpResponse('검색 범위를 좁혀주세요. 내보내기 행 수 제한을 초과했습니다.',status=400)

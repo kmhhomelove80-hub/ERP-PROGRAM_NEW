@@ -148,3 +148,8 @@
 .receipt-mode #id_item_mode{display:flex;gap:20px;flex-wrap:wrap}
 .receipt-mode label{display:flex;align-items:center;gap:8px;margin:4px 0;min-height:40px}
 .entry .receipt-mode input[type=radio]{width:20px!important;height:20px;min-height:20px;flex:none;padding:0}
+
+.scan-result{background:#e8f4ee;border:1px solid #c6dfd2;border-radius:8px;padding:10px 12px;margin:8px 0;line-height:1.5}
+.scan-result-code{display:block;white-space:nowrap;overflow-x:auto;font-family:ui-monospace,monospace;font-size:16px}
+.scan-result p{font-size:13px;margin:4px 0}
+.scan-result small{font-size:12px}

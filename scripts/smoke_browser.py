@@ -99,10 +99,10 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
                 assert tabs.count()==3
                 for tab in tabs.all():
                     box=tab.bounding_box();assert box['height']>=44 and box['width']>=44
-                # Twelve-character ERP codes, including symbols, stay on one line.
+                # Sixteen-character ERP codes, including symbols, stay on one line.
                 assert phone.locator('.stock-item').first.evaluate("""node => {
                     const old = node.textContent;
-                    node.textContent = 'WWWWWW-*1234';
+                    node.textContent = 'WWWWWWWWWW-*1234';
                     const style = getComputedStyle(node);
                     const next = node.nextElementSibling.getBoundingClientRect();
                     const rect = node.getBoundingClientRect();
@@ -111,7 +111,7 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
                     node.textContent = old;
                     return fits;
                 }""")
-                assert phone.locator('#stock-filter input').is_visible()
+                assert phone.locator('#stock-filter input[name=q]').is_visible()
                 for selector in ['#stock-filter select', '#stock-filter button:not(#scan-open)', '.stock-overview', '.stock-erp-note']:
                     assert not phone.locator(selector).is_visible(), selector
                 assert phone.locator('#scan-open').is_visible()
@@ -128,7 +128,8 @@ w=Workbook();s=w.active;s.title='ERP재고';s.append(['창고','ERP 코드','현
             phone.set_viewport_size({'width':390,'height':844})
             # Exercise unsupported, denied, and successful camera paths with mocks.
             phone.evaluate("Object.defineProperty(window, 'isSecureContext', {configurable:true, value:false})")
-            phone.locator('#scan-open').click()
+            with phone.expect_file_chooser():
+                phone.locator('#scan-open').click()
             assert phone.locator('#scan-status').get_by_text('현재 접속에서는 실시간 카메라를 사용할 수 없습니다.',exact=False).is_visible()
             phone.locator('#scan-close').click()
             phone.evaluate("Object.defineProperty(window, 'isSecureContext', {configurable:true, value:true})")
@@ -412,6 +413,35 @@ print(order.pk)
             assert pc.get_by_text('요청 수량과 일치',exact=False).is_visible()
             assert pc.get_by_role('link',name='미배정 물량 추가 피킹',exact=True).count()==0
             pc.screenshot(path=str(artifacts/'picking-supplement-complete.png'),full_page=True)
+            scan_seed = "from inventory.models import Item,Stock; q=Item.objects.create(code='ABK13W1PGRG0000H'); Stock.objects.create(item=q,location='QR-C0408',quantity=12,reserved=0); Stock.objects.create(item=q,location='QR-D0201',quantity=3); b=Item.objects.create(code='ARS21SWPR0000000'); Stock.objects.create(item=b,location='BAR-G01',quantity=9)"
+            subprocess.run([str(python),'manage.py','shell','-c',scan_seed],cwd=root,env=environment,check=True,stdout=subprocess.DEVNULL)
+            phone.goto(base+'/')
+            phone.evaluate("Object.defineProperty(window,'isSecureContext',{configurable:true,value:false})")
+            qr16=phone.evaluate("""()=>{
+                const matrix=new ZXing.QRCodeWriter().encode('ABK13W1PGRG0000H',ZXing.BarcodeFormat.QR_CODE,400,400,new Map());
+                const c=document.createElement('canvas');c.width=400;c.height=400;
+                const ctx=c.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,400,400);ctx.fillStyle='black';
+                for(let y=0;y<400;y++)for(let x=0;x<400;x++)if(matrix.get(x,y))ctx.fillRect(x,y,1,1);
+                return c.toDataURL('image/png').split(',')[1];
+            }""")
+            phone.locator('#scan-open').click()
+            phone.locator('#scan-photo').set_input_files({'name':'product-qr16.png','mimeType':'image/png','buffer':base64.b64decode(qr16)})
+            phone.wait_for_function("!document.querySelector('#scan-dialog').open && document.querySelector('#stock-search-status').textContent==='조회 완료' && new URL(location.href).searchParams.get('scan')==='1'")
+            assert phone.locator('.stock-row').count()==2
+            assert phone.locator('.scan-result').get_by_text('ABK13W1PGRG0000H',exact=True).is_visible()
+            assert phone.locator('.stock-row summary').filter(has_text='QR-C0408').count()==1
+            assert '등록 수량 15' in phone.locator('.scan-result').inner_text()
+            phone.screenshot(path=str(artifacts/'scan-product-qr-locations.png'))
+            phone.locator('#scan-open').click()
+            phone.locator('#scan-photo').set_input_files(str(root/'scripts/fixtures/product-code128-16-rotated.svg'))
+            phone.wait_for_function("!document.querySelector('#scan-dialog').open && document.querySelector('#stock-search-status').textContent==='조회 완료' && new URL(location.href).searchParams.get('q')==='ARS21SWPR0000000'")
+            assert phone.locator('.stock-row').count()==1
+            assert 'BAR-G01' in phone.locator('.stock-row summary').inner_text()
+            assert '등록 수량 9' in phone.locator('.scan-result').inner_text()
+            phone.get_by_role('textbox',name='재고 검색',exact=True).fill('QR-C0408')
+            phone.wait_for_function("document.querySelector('#stock-search-status').textContent==='조회 완료' && new URL(location.href).searchParams.get('q')==='QR-C0408'")
+            assert phone.locator('.scan-result').count()==0
+            assert phone.locator('.stock-row').count()==1
             # Register a completely new ERP item and its receipt on the same screen.
             pc.goto(base+'/receipts/new/')
             assert pc.get_by_role('radio',name='기존 품목',exact=True).is_checked()
@@ -487,7 +517,7 @@ print(order.pk)
                 assert pc.locator(f'[name="{name}"]').count()==0
             pc.screenshot(path=str(artifacts/'simple-user-permissions.png'),full_page=True)
             assert not errors,errors
-            report={'in_app_manual_search_pdf_and_unsaved_form_preserved':True,'existing_new_item_selection_and_atomic_receipt_ui':True,'actual_code128_photo_local_decoder':True,'phone_scan_icon_desktop_hidden_photo_picker_return':True,'desktop_single_line_specifications_with_table_scroll':True,'same_order_80_released_20_supplemented':True,'two_roles_simple_admin_and_reader_no_mutation_controls':True,'mobile_all_headers_toggle_numeric_sort_and_search_preserves_order':True,'ime_search_before_blur_compositionend':True,'phone_search_and_rows_only_desktop_controls_preserved':True,'company_logo_loaded_login_and_header':True,'erp_12_char_symbols_single_line_320_to_844':True,'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
+            report={'scan_16char_products_auto_lookup_qr_rotated_code128':True,'in_app_manual_search_pdf_and_unsaved_form_preserved':True,'existing_new_item_selection_and_atomic_receipt_ui':True,'actual_code128_photo_local_decoder':True,'phone_scan_icon_desktop_hidden_photo_picker_return':True,'desktop_single_line_specifications_with_table_scroll':True,'same_order_80_released_20_supplemented':True,'two_roles_simple_admin_and_reader_no_mutation_controls':True,'mobile_all_headers_toggle_numeric_sort_and_search_preserves_order':True,'ime_search_before_blur_compositionend':True,'phone_search_and_rows_only_desktop_controls_preserved':True,'company_logo_loaded_login_and_header':True,'erp_16_char_symbols_single_line_320_to_844':True,'movement_live_typing_clear_status':True,'compact_expandable_stock_rows':True,'scanner_mock_success_denied_http':True,'actual_qr_photo_local_decoder':True,'mobile_sizes_320_360_390_430_844':True,'mobile_touch_targets_44px':True,'mobile_numeric_quantity_input':True,'mobile_bottom_navigation':True,'mobile_allocation_project_details':True,'mobile_manager_menus_and_processing_hidden':True,'portrait_and_landscape_mobile_layout':True,'mobile_viewport':'390x844','desktop_viewport':'1440x1000','mobile_submit_admin_process_mobile_result':True,'no_mobile_detail_page_horizontal_overflow':True,'history_search':True,'picking_paste_confirm_and_pdf':True,'javascript_errors':errors,'synthetic_data_only':True,'erp_upload_compare_review':True,'y02_shortage_reference':True,'receipt_create_and_cancel':True,'operational_reservation_check':True,'completed_order_survives_master_edit':True,'stock_and_erp_excel_downloads':True,'server':'waitress' if args.waitress else 'runserver'}
             (artifacts/'result.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
             print(json.dumps(report,ensure_ascii=False,indent=2))
             browser.close()

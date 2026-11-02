@@ -35,7 +35,7 @@ class StockSortTests(TestCase):
 
     def test_invalid_sort_is_safe_and_hull_join_does_not_duplicate_totals(self):
         response = self.client.get('/', {'sort':'hull'})
-        self.assertEqual(response.context['totals'], {'quantity':17,'reserved':5})
+        self.assertEqual(response.context['totals'], {'quantity':17,'reserved':5,'available':12})
         self.assertEqual(response.context['page_obj'].paginator.count,2)
         response = self.client.get('/', {'sort':'item__code;DROP TABLE','direction':'invalid'})
         self.assertEqual(response.context['sort'],'code')

@@ -38,7 +38,9 @@
     target.search = params.toString();
     return target;
   }
-  function schedule() {
+  function schedule(event) {
+    if (event?.target.name === 'q' && form.elements.scan) form.elements.scan.value = '';
+
     clearTimeout(timer);
     status.textContent = '조회 대기…';
     // Invalidate and cancel in-flight work immediately, even during debounce.
