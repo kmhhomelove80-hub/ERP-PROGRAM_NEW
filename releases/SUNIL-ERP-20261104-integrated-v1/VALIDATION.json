@@ -1,0 +1,36 @@
+{
+  "success": true,
+  "windows_native_success": true,
+  "commit": "b6bbed7065da76779e27f4e41df9f01b2aed56a4",
+  "run_url": "https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/actions/runs/41675488294",
+  "erp_run_url": "https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/actions/runs/41675488403",
+  "windows_runner": "Windows Server 2025 / Python 3.12",
+  "tests": {
+    "app_total": 257,
+    "windows_skipped": 12,
+    "postgresql18_skipped": 5,
+    "update_engine": 18,
+    "windows_native": 2
+  },
+  "jobs": [
+    {
+      "name": "windows-python312",
+      "conclusion": "success",
+      "url": "https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/actions/runs/41675488294/job/126054847961"
+    },
+    {
+      "name": "postgresql18",
+      "conclusion": "success",
+      "url": "https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/actions/runs/41675488294/job/126054848382"
+    },
+    {
+      "name": "browser",
+      "conclusion": "success",
+      "url": "https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/actions/runs/41675488294/job/126054848688"
+    }
+  ],
+  "note": "Windows native DPAPI fixture owner validation, secret log exclusion, CIM creation-token and matched Waitress stop passed. Actual server's existing task/config preflight is still required. No antivirus-clean claim.",
+  "postgresql18_release_roundtrip": "passed: 1460a6c -> integrated application; original inventory/accounts/grants preserved; binary workbook backup/new-DB restore matched; injected post-migration failure restored code/tasks and retained additive schema",
+  "verified_application_and_helper_files": 179,
+  "browser": "Production import/mapping/search/sort/parts/CSV/XSS, independent menu permissions, live movement notice/delegated approval, separated production area and mobile dropdown viewport bounds passed"
+}
