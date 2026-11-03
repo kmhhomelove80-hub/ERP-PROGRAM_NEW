@@ -535,7 +535,8 @@ def main(argv=None):
                 run=pending[0];journal=json.loads((run/'journal.json').read_text(encoding='utf-8'))
                 if journal['owner_sid']!=ops.sid or journal['release']!=(('SUNIL-ERP-20261104-integrated-v2') if args.mode=='reconcile' else manifest['release']) or os.path.normcase(os.path.abspath(journal['app_root']))!=os.path.normcase(os.path.abspath(ops.app)):
                     raise RuntimeError('같은 계정·설치·버전의 복구 기록이 아닙니다.')
-                ops.run=run
+                # Retain original failure logs; reconciliation has its own logs.
+                ops.run=run/'reconcile-logs'/uuid.uuid4().hex if args.mode=='reconcile' else run
                 if args.mode=='reconcile':
                     reconcile(ops,run,manifest,journal)
                     print('기존 코드·웹·예약 작업 확인 및 미완료 기록 정리 완료. ERP 중지·파일 교체·DB 변경은 하지 않았습니다.')
