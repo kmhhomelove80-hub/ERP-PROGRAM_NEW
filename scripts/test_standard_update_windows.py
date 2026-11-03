@@ -35,7 +35,7 @@ class NativeWindowsTests(unittest.TestCase):
         tasks=[{'name':'SUNIL-ERP','path':task_path,'enabled':True},
                {'name':'SUNIL-LocalBackup','path':task_path,'enabled':True}]
         try:
-            self.ops.ps("$v=$env:SUNIL_VALUES|ConvertFrom-Json; $action=New-ScheduledTaskAction -Execute ($env:SystemRoot+'\\System32\\cmd.exe') -Argument '/c exit 0'; foreach($t in $v.tasks){Register-ScheduledTask -TaskName $t.name -TaskPath $t.path -Action $action -Force -ErrorAction Stop|Out-Null; Disable-ScheduledTask -TaskName $t.name -TaskPath $t.path -ErrorAction Stop|Out-Null}",values={'tasks':tasks})
+            self.ops.ps("$v=$env:SUNIL_VALUES|ConvertFrom-Json; $svc=New-Object -ComObject Schedule.Service; $svc.Connect(); [void]$svc.GetFolder('\\').CreateFolder($v.tasks[0].path.Trim('\\')); $action=New-ScheduledTaskAction -Execute ($env:SystemRoot+'\\System32\\cmd.exe') -Argument '/c exit 0'; foreach($t in $v.tasks){Register-ScheduledTask -TaskName $t.name -TaskPath $t.path -Action $action -Force -ErrorAction Stop|Out-Null; Disable-ScheduledTask -TaskName $t.name -TaskPath $t.path -ErrorAction Stop|Out-Null}",values={'tasks':tasks})
             # Single-item v2 call passed; exactly the multi-item JSON form that
             # failed on the server MUST fail under native Windows PowerShell 5.1.
             legacy="$a=@($env:SUNIL_VALUES|ConvertFrom-Json); foreach($t in $a){Enable-ScheduledTask -TaskName $t.name -TaskPath $t.path -ErrorAction Stop|Out-Null}"
