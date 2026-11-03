@@ -73,7 +73,7 @@ def atomic_copy(source, target):
     try:
         shutil.copyfile(source, temporary)
         if digest(temporary) != digest(source): raise RuntimeError('복사 파일의 체크섬이 다릅니다.')
-        with open(temporary, 'rb') as stream: os.fsync(stream.fileno())
+        with open(temporary, 'r+b') as stream: os.fsync(stream.fileno())
         os.replace(temporary, target)
     finally:
         if os.path.exists(temporary): os.unlink(temporary)
@@ -307,7 +307,8 @@ class WindowsOps:
 
     def command(self, args, label, timeout=180, env=None, secret=False):
         failure = None
-        with subprocess.Popen(args,cwd=self.app,env=env or self.env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+        child_env = {**(env or self.env), 'PYTHONIOENCODING':'utf-8', 'PYTHONUTF8':'1'}
+        with subprocess.Popen(args,cwd=self.app,env=child_env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
                               text=True,encoding='utf-8',start_new_session=os.name!='nt') as process:
             deadline = time.monotonic() + timeout
             while True:
