@@ -56,6 +56,9 @@ w.save(sys.argv[1]);w.close()
             errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
             page.goto(base+'/login/')
             page.locator('[name=username]').fill('plan-test');page.locator('[name=password]').fill('Browser-Test-Only-927!');page.locator('button[type=submit],form button').first.click()
+            page.get_by_role('link',name='생산계획조회',exact=True).click()
+            assert page.url.endswith('/production/')
+            page.get_by_role('link',name='엑셀 열기 · 열 연결 설정',exact=True).wait_for(state='visible')
             page.goto(base+'/production/settings/')
             page.locator('[name=workbook]').set_input_files(str(seed_file));page.get_by_role('button',name='파일 읽기',exact=True).click()
             assert page.locator('select[name^=col_] option:checked').count()==13
@@ -89,6 +92,13 @@ w.save(sys.argv[1]);w.close()
             page.locator('#plan-table tbody tr').first.click()
             page.screenshot(path=str(artifacts/'desktop.png'),full_page=True)
             page.set_viewport_size({'width':390,'height':844})
+            assert page.get_by_role('link',name='생산계획조회',exact=True).is_visible()
+            menus=page.locator('.primary-nav > details')
+            for index in range(menus.count()):
+                menus.nth(index).locator('summary').click()
+                assert page.locator('.primary-nav > details[open]').count()==1
+            page.locator('h1').click()
+            assert page.locator('.primary-nav > details[open]').count()==0
             page.screenshot(path=str(artifacts/'mobile.png'),full_page=True)
             assert page.evaluate('document.documentElement.scrollWidth<=window.innerWidth')
             assert not errors,errors

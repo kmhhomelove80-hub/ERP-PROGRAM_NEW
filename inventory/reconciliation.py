@@ -1,3 +1,4 @@
+from .menu_permissions import require_menu_write
 """ERP reference snapshots never overwrite warehouse inventory."""
 import hashlib
 import io
@@ -74,6 +75,7 @@ def template_bytes():
 
 @warehouse_transaction
 def create_snapshot(*, request_id, label, erp_as_of, plan, actor):
+    require_menu_write(actor, 'management')
     rows=validate_rows(plan['rows'])
     if timezone.is_naive(erp_as_of) or erp_as_of>timezone.now(): raise ValidationError('ERP 기준 시각을 확인하세요.')
     previous=ErpSnapshot.objects.filter(pk=request_id).first()
@@ -108,6 +110,7 @@ def latest_reference(warehouse,codes):
 
 @warehouse_transaction
 def update_review(*, row_id, state, reason, action_note, actor):
+    require_menu_write(actor, 'management')
     row=ReconciliationRow.objects.select_for_update().get(pk=row_id)
     if not row.needs_review: raise ValidationError('차이 또는 ERP 누락 항목만 사유를 기록할 수 있습니다.')
     if state not in ['open','explained','resolved'] or (state!='open' and not reason.strip()) or (state=='resolved' and not action_note.strip()):

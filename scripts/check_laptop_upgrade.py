@@ -1,3 +1,4 @@
+from contextlib import closing
 """Exercise 0010 -> current laptop upgrade and restore using disposable data."""
 import os
 from pathlib import Path
@@ -50,7 +51,7 @@ with tempfile.TemporaryDirectory(prefix='sunil-upgrade-') as directory:
     assert len(list((data/'upgrade-backups').glob('sunil-*')))==1
     restored=Path(directory)/'restored-old.sqlite3'
     restore_backup(backups[0],sqlite_target=restored)
-    with sqlite3.connect(restored) as db:
+    with closing(sqlite3.connect(restored)) as db:
         assert db.execute('select quantity,reserved from inventory_stock').fetchone()==(12,4)
         columns=[row[1] for row in db.execute('pragma table_info(inventory_receipt)')]
         assert 'arrival_stock_id' not in columns

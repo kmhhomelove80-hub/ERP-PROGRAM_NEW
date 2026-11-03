@@ -54,7 +54,9 @@ class InAppManualTests(TestCase):
             self.assertEqual(response['Content-Type'],'application/pdf')
             self.assertIn(disposition,response['Content-Disposition'])
             self.assertTrue(b''.join(response.streaming_content).startswith(b'%PDF'))
-            response.close()
+            # Client FileResponse.close() emits request_finished and closes the
+            # PostgreSQL connection inside TestCase's outer atomic block.
+            # Consume the stream; Django owns response cleanup.
 
     def test_missing_release_files_report_not_found(self):
         self.client.force_login(self.reader)

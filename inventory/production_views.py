@@ -5,18 +5,18 @@ from django.db import transaction
 from django.core import signing
 from django.shortcuts import render, redirect
 from django.views.decorators.http import require_http_methods
-from .access import warehouse_access, warehouse_write
+from .access import menu_access
 from .models import ProductionPlanDraft, ProductionPlanSnapshot
 from .production import MAX_UPLOAD, open_workbook, settings_for, extract
 from .production_mapping import KEYS, LABELS, MappingError
 
-@warehouse_access
+@menu_access('production')
 @require_http_methods(['GET'])
 def production_plan(request):
     snapshot=ProductionPlanSnapshot.objects.filter(pk=1).first()
     return render(request,'inventory/production_plan.html',{'snapshot':snapshot,'headers':['원본 행',*LABELS[:9]],'plan_data':snapshot.rows if snapshot else [],'part_headers':LABELS[9:]})
 
-@warehouse_write
+@menu_access('production', write=True)
 @require_http_methods(['GET','POST'])
 def production_settings(request):
     draft,_=ProductionPlanDraft.objects.get_or_create(user=request.user)

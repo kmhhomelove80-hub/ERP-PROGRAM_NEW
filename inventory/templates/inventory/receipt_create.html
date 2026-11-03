@@ -1,6 +1,6 @@
 {% extends 'inventory/base.html' %}{% load static %}{% block content %}
 <div class="entry"><h1>{{ title }}</h1><p>{{ description }}</p>
-{% if user.is_staff %}<form method="post" class="card" id="receipt-form">{% csrf_token %}{{ form.non_field_errors }}{{ form.request_id }}{{ form.request_id.errors }}
+{% if menu_permissions.receiving %}<form method="post" class="card" id="receipt-form">{% csrf_token %}{{ form.non_field_errors }}{{ form.request_id }}{{ form.request_id.errors }}
 <fieldset class="receipt-mode"><legend>품목 구분</legend>{{ form.item_mode }}{{ form.item_mode.errors }}</fieldset>
 <div id="receipt-existing"><p>{{ form.item.as_field_group }}</p></div>
 <div id="receipt-new"><p class="notice">신규 품목과 입고를 함께 등록합니다. 이미 있는 ERP 코드는 기존 품목으로 등록하세요.</p><p>{{ form.new_code.as_field_group }}</p><p>{{ form.new_name.as_field_group }}</p><p>{{ form.new_specification.as_field_group }}</p></div>

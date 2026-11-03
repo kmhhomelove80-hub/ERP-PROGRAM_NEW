@@ -1,3 +1,4 @@
+from .menu_permissions import require_menu_write, can_write
 from django.core.exceptions import ValidationError
 from .locking import warehouse_transaction
 from django.utils import timezone
@@ -15,6 +16,7 @@ def audit(actor, action, reference, **detail):
 
 @warehouse_transaction
 def reserve(*, stock_id, project, quantity, actor):
+    require_menu_write(actor, 'shipping')
     stock = Stock.objects.select_for_update().get(pk=stock_id)
     if not isinstance(quantity, int) or isinstance(quantity, bool) or quantity <= 0 or quantity > stock.available or not project.strip():
         raise ValidationError('프로젝트와 가용량 이내의 양수 수량이 필요합니다.')
@@ -26,6 +28,7 @@ def reserve(*, stock_id, project, quantity, actor):
 
 @warehouse_transaction
 def cancel_allocation(*, allocation_id, actor):
+    require_menu_write(actor, 'shipping')
     a = Allocation.objects.select_for_update().get(pk=allocation_id)
     if a.state != 'reserved': raise ValidationError('예약 상태만 취소할 수 있습니다.')
     stock = Stock.objects.select_for_update().get(pk=a.stock_id)
@@ -40,6 +43,7 @@ def cancel_allocation(*, allocation_id, actor):
 
 @warehouse_transaction
 def release_selected(*, allocation_ids, shipped_at, actor):
+    require_menu_write(actor, 'shipping')
     ids = set(allocation_ids)
     if not ids or shipped_at is None or timezone.is_naive(shipped_at) or shipped_at > timezone.now():
         raise ValidationError('출고 대상과 시간대가 포함된 실제 출고 시각이 필요합니다.')
@@ -65,6 +69,8 @@ def release_selected(*, allocation_ids, shipped_at, actor):
 
 @warehouse_transaction
 def submit_movement(*, request_id, source_id, destination, quantity, actor):
+    if not actor.is_active:
+        raise ValidationError('활성 계정만 이동 요청을 등록할 수 있습니다.')
     destination = destination.strip()
     previous = MovementRequest.objects.filter(pk=request_id).first()
     if previous:
@@ -84,6 +90,8 @@ def submit_movement(*, request_id, source_id, destination, quantity, actor):
 
 @warehouse_transaction
 def process_movement(*, request_id, actor, rejection_reason=''):
+    if not can_write(actor, 'inventory'):
+        raise ValidationError('관리자만 이동을 승인·실행할 수 있습니다.')
     request = MovementRequest.objects.select_for_update().get(pk=request_id)
     if request.state != 'pending': return request
     source = Stock.objects.select_for_update().select_related('item').get(pk=request.source_id)
@@ -114,6 +122,7 @@ def process_movement(*, request_id, actor, rejection_reason=''):
 
 @warehouse_transaction
 def receive_stock(*, item_id, location, quantity, status, expected_date, sender, request_id, actor):
+    require_menu_write(actor, 'receiving')
     from .models import Receipt
     require_quantity(quantity)
     location, sender = location.strip(), sender.strip()
@@ -143,6 +152,7 @@ def receive_stock(*, item_id, location, quantity, status, expected_date, sender,
 @warehouse_transaction
 def confirm_arrival(*, stock_id, location, actor):
     """Convert an entire expected bucket; keep active reservations attached."""
+    require_menu_write(actor, 'receiving')
     source = Stock.objects.select_for_update().get(pk=stock_id)
     location = location.strip()
     if source.status != Stock.Status.EXPECTED or source.quantity <= 0 or not location:
@@ -164,6 +174,7 @@ def confirm_arrival(*, stock_id, location, actor):
 
 @warehouse_transaction
 def cancel_selected(*, allocation_ids, actor):
+    require_menu_write(actor, 'shipping')
     ids = set(allocation_ids)
     if not ids: raise ValidationError('취소 대상을 선택하세요.')
     rows = list(Allocation.objects.filter(pk__in=ids))
@@ -174,6 +185,7 @@ def cancel_selected(*, allocation_ids, actor):
 
 @warehouse_transaction
 def cancel_receipt(*, receipt_id, reason, actor):
+    require_menu_write(actor, 'receiving')
     from .models import Receipt
     receipt=Receipt.objects.select_for_update().get(pk=receipt_id)
     if receipt.cancelled_at:return receipt
@@ -195,7 +207,7 @@ def register_receipt(*, item_mode, item_id=None, new_code='', new_name='', new_s
                      location, quantity, status, expected_date, sender, request_id, actor):
     """Create a new item and receipt as one transaction, including retry protection."""
     from .models import Item, Receipt
-    if not actor.is_active or not actor.is_staff:
+    if not can_write(actor, 'receiving'):
         raise ValidationError('모든 권한 계정만 입고를 등록할 수 있습니다.')
     if item_mode == 'existing':
         if not Item.objects.filter(pk=item_id).exists():

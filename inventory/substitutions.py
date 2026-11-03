@@ -1,3 +1,4 @@
+from .menu_permissions import can_write
 """Audited 1:1 substitutions: requested demand and physical stock stay separate."""
 from collections import defaultdict
 from django.core.exceptions import ValidationError
@@ -24,7 +25,7 @@ def demand_balance(order):
 
 @warehouse_transaction
 def reserve_substitution(*, request_id, order_id, requested, stock_id, quantity, reason, actor):
-    if not actor.is_active or not actor.is_staff: raise ValidationError('관리자만 대체 출고를 배정할 수 있습니다.')
+    if not can_write(actor, 'shipping'): raise ValidationError('관리자만 대체 출고를 배정할 수 있습니다.')
     require_quantity(quantity)
     reason=reason.strip();requested=requested.strip()
     if not reason or len(reason)>1000: raise ValidationError('대체 사유를 1~1,000자로 입력하세요.')
@@ -50,7 +51,7 @@ def reserve_substitution(*, request_id, order_id, requested, stock_id, quantity,
 
 @warehouse_transaction
 def confirm_company_erp(*, substitution_id, confirmed, note, actor):
-    if not actor.is_active or not actor.is_staff: raise ValidationError('관리자만 확인할 수 있습니다.')
+    if not can_write(actor, 'shipping'): raise ValidationError('관리자만 확인할 수 있습니다.')
     record=Substitution.objects.select_for_update().select_related('allocation').get(pk=substitution_id)
     note=note.strip()
     if record.allocation.state!='settled':raise ValidationError('전량 상환 완료 후 회사 ERP 정산을 확인하세요.')
@@ -92,7 +93,7 @@ def repaid_quantity(record, cutoff=None):
 
 @warehouse_transaction
 def dispatch_substitution(*, substitution_id, shipped_at, product_confirmed, actor):
-    if not actor.is_active or not actor.is_staff:raise ValidationError('관리자만 처리할 수 있습니다.')
+    if not can_write(actor, 'shipping'):raise ValidationError('관리자만 처리할 수 있습니다.')
     if not product_confirmed:raise ValidationError('동일 제품 또는 필요한 수정 완료를 확인하세요.')
     if shipped_at is None or timezone.is_naive(shipped_at) or shipped_at>timezone.now():raise ValidationError('실제 출고 시각을 확인하세요.')
     record=Substitution.objects.select_for_update().select_related('allocation').get(pk=substitution_id)
@@ -117,7 +118,7 @@ def dispatch_substitution(*, substitution_id, shipped_at, product_confirmed, act
 def settle_substitution(*, request_id, substitution_id, receipt_id, quantity, note, product_confirmed, actor):
     from .models import Receipt, SubstitutionSettlement
     from django.db.models import Sum
-    if not actor.is_active or not actor.is_staff:raise ValidationError('관리자만 상환할 수 있습니다.')
+    if not can_write(actor, 'shipping'):raise ValidationError('관리자만 상환할 수 있습니다.')
     require_quantity(quantity);note=note.strip()
     if not product_confirmed or not note or len(note)>1000:raise ValidationError('동일 제품/수정 완료 확인과 상환 근거를 입력하세요.')
     previous=SubstitutionSettlement.objects.filter(pk=request_id).first()
@@ -157,7 +158,7 @@ def settle_substitution(*, request_id, substitution_id, receipt_id, quantity, no
 @warehouse_transaction
 def cancel_substitution(*,substitution_id,note,actor):
     from .services import cancel_selected
-    if not actor.is_active or not actor.is_staff:raise ValidationError('관리자만 취소할 수 있습니다.')
+    if not can_write(actor, 'shipping'):raise ValidationError('관리자만 취소할 수 있습니다.')
     record=Substitution.objects.select_for_update().select_related('allocation').get(pk=substitution_id)
     if record.allocation.state!='reserved' or record.dispatched_at:raise ValidationError('빌림 출고 전 예약만 취소할 수 있습니다.')
     if not note.strip() or len(note)>1000:raise ValidationError('취소 사유를 남기세요.')

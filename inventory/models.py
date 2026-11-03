@@ -218,3 +218,16 @@ class ProductionPlanSnapshot(models.Model):
     config = models.JSONField(default=dict)
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class EmployeeMenuAccess(models.Model):
+    """Explicit rights for visible top-level menus, independent of admin login."""
+    class Level(models.TextChoices):
+        READ = 'read', '조회만 가능'
+        FULL = 'full', '모두 가능'
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='menu_access')
+    receiving = models.CharField('입고 관리', max_length=4, choices=Level.choices, default=Level.READ)
+    shipping = models.CharField('출고 관리', max_length=4, choices=Level.choices, default=Level.READ)
+    production = models.CharField('생산계획조회', max_length=4, choices=Level.choices, default=Level.READ)
+    inventory = models.CharField('재고 관리', max_length=4, choices=Level.choices, default=Level.READ)
+    management = models.CharField('관리', max_length=4, choices=Level.choices, default=Level.READ)

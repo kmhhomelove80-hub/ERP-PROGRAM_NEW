@@ -54,4 +54,3 @@ def validate_mapping(mapping, max_column):
     for col in mapping.values():
         if not isinstance(col,str) or not re.fullmatch('[A-Z]{1,3}',col) or not 1 <= column_index_from_string(col) <= max_column:
             raise ValueError('선택한 열이 시트에 없습니다.')
-

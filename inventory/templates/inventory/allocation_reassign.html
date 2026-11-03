@@ -1,0 +1,6 @@
+{% extends 'inventory/base.html' %}{% block content %}
+<h1>예약 위치·수량 변경</h1><p>{{ allocation.project }} · {{ allocation.stock.item.code }} · 기존 {{ allocation.stock.location }} / {{ allocation.quantity }}개</p>
+<p class="notice">총수량과 주문 연결은 유지합니다. 기존 예약 해제와 새 예약은 함께 처리하며, 다른 예약은 사용할 수 없습니다. 실제 재고 이동이 필요한 경우에는 재고 이동 요청을 사용하세요. 입고 예정분은 도착 확인 후 출고할 수 있습니다.</p>
+{% include 'inventory/reservation_candidates.html' %}
+<form method="post" class="card entry">{% csrf_token %}{{ form.as_p }}<button>예약 배정 변경</button></form>
+{% endblock %}

@@ -2,7 +2,11 @@
 
 회사 ERP의 부산(Y09) 로케이션 관리를 보완하는 Django 웹 프로그램. 영주(Y02)는 본사 참고 수량이다. PC와 휴대폰에서 재고·입고·피킹·출고·이동·전산 대조를 사용한다. AS는 제외한다.
 
-현재 핵심 기능 구현/개발 검증을 완료했으며 운영 서버에는 배포하지 않았다. 회사 서버·호스트명·후임자·최종 자료를 확인한 뒤 전환한다.
+2026-11-03 기능 업데이트입니다. 기준 커밋은 d425d71이며, 기존 Windows 운영 환경에 대한 업데이트 절차는 아래 문서를 사용합니다. 개발 환경에서는 운영 서버·DB를 변경하지 않습니다.
+
+- [이번 기능·사용법·계산 한도](docs/UPDATE_20261103.md)
+- [Windows 운영 서버 업데이트·되돌리기](docs/WINDOWS_UPDATE_20261103.md)
+- [검증 결과](docs/VALIDATION_20261103.md)
 
 - [생산계획 웹 조회·엑셀 열 연결 설정](docs/PRODUCTION_PLAN.md)
 - [Windows 노트북·같은 Wi-Fi 휴대폰 테스트](docs/LAPTOP_TEST.md)
@@ -18,7 +22,7 @@
 Python 3.12에서 검증했다. 기존 checkout을 사용하며 별도 worktree가 필요하지 않다.
 
 ```bash
-cd /workspace/ERP-for-SUNIL
+cd /workspace/ERP-PROGRAM_NEW
 python -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python manage.py migrate

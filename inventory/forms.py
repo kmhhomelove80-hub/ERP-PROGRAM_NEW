@@ -102,7 +102,7 @@ class MovementProcessForm(forms.Form):
 
 class HistoryFilterForm(forms.Form):
     q = forms.CharField(label='검색',required=False,max_length=100)
-    action = forms.ChoiceField(label='작업 종류',required=False,choices=[('','전체'),('initial_import','초기 이관'),('receipt','입고'),('item_created','신규 품목 등록'),('receipt_batch','일괄 입고'),('substitution_reserved','대체 예약'),('substitution_dispatch','대체 출고(빌림)'),('substitution_settlement','입고분 상환'),('substitution_cancel','대체 예약 취소'),('substitution_erp','회사 ERP 정산 확인'),('receipt_cancel','입고 취소'),('arrival','도착 확인'),('reserve','예약'),('cancel','예약 취소'),('release','출고 확정'),('picking_confirm','피킹 등록'),('picking_supplement','미배정 추가 피킹'),('movement_requested','이동 요청'),('movement','이동 처리'),('erp_snapshot','ERP 대조 등록'),('reconciliation_review','차이 분석 기록'),('legacy_archive','과거 이력 보관 이관')])
+    action = forms.ChoiceField(label='작업 종류',required=False,choices=[('','전체'),('initial_import','초기 이관'),('receipt','입고'),('item_created','신규 품목 등록'),('receipt_batch','일괄 입고'),('substitution_reserved','대체 예약'),('substitution_dispatch','대체 출고(빌림)'),('substitution_settlement','입고분 상환'),('substitution_cancel','대체 예약 취소'),('substitution_erp','회사 ERP 정산 확인'),('receipt_cancel','입고 취소'),('arrival','도착 확인'),('reserve','예약'),('cancel','예약 취소'),('release','출고 확정'),('picking_confirm','피킹 등록'),('picking_supplement','미배정 추가 피킹'),('allocation_reassign','예약 위치 변경'),('movement_requested','이동 요청'),('movement','이동 처리'),('erp_snapshot','ERP 대조 등록'),('reconciliation_review','차이 분석 기록'),('legacy_archive','과거 이력 보관 이관')])
     start = forms.DateField(label='시작일',required=False,widget=forms.DateInput(attrs={'type':'date'}))
     end = forms.DateField(label='종료일',required=False,widget=forms.DateInput(attrs={'type':'date'}))
     def clean(self):
@@ -222,3 +222,14 @@ class PickingSupplementForm(forms.Form):
     preview_token = forms.CharField(widget=forms.HiddenInput, max_length=500000)
     confirmed = forms.BooleanField(label='기존 주문과 추가 배정할 코드·위치·수량을 확인했습니다.')
     allow_shortage = forms.BooleanField(label='남은 부족 수량을 확인했으며, 입고 완료된 가용 수량만 추가 예약합니다.', required=False)
+
+
+class ReassignmentForm(forms.Form):
+    request_id = forms.UUIDField(widget=forms.HiddenInput, initial=uuid.uuid4)
+    snapshot_token = forms.CharField(widget=forms.HiddenInput, max_length=500000)
+    targets = forms.CharField(label='새 배정: 재고 ID · 수량 (한 줄에 두 열)', max_length=50000, widget=forms.Textarea(attrs={'rows':6}), help_text='아래 실제 재고 ID를 사용하세요. 여러 위치로 나눌 수 있으며 합계는 기존 예약 수량과 같아야 합니다.')
+    reason = forms.CharField(label='변경 사유', max_length=1000)
+    confirmed = forms.BooleanField(label='품목·위치·총수량을 확인했습니다.')
+    def clean_targets(self):
+        from .reassignment import parse_targets
+        return parse_targets(self.cleaned_data['targets'])

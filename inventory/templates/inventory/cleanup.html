@@ -1,0 +1,13 @@
+{% extends 'inventory/base.html' %}{% block content %}
+<h1>재고 정리 리스트</h1>
+<p>출력 시각 {{ generated_at|date:'Y-m-d H:i' }} · Y09 입고 완료분 · 같은 품목·위치 합계 3개 이하인 출발 위치 · 예약 있는 위치 제외</p>
+<p class="notice">출력만으로 재고를 변경하지 않습니다. 목적지 공간·보관 조건과 실제 수량을 작업자가 확인한 뒤 이동 요청을 등록하고, 관리자가 승인·실행합니다. 출력 후 예약·입고·출고가 바뀔 수 있으므로 실행 때 재확인하세요. 입고 예정분은 제외합니다.</p>
+<form class="filters no-print"><input name="q" value="{{ query }}" aria-label="정리 품목 검색" placeholder="ERP 코드 / 모델"><button>조회</button><button type="button" onclick="window.print()">인쇄 / PDF 저장</button></form>
+{% for group in groups %}<section class="card cleanup-group"><h2>{{ group.item.code }} · {{ group.item.name }} <small>비울 위치 {{ group.emptied }}곳</small></h2>
+<p>기본 도착: {{ group.destination }} · 현재 {{ group.destination_before }} → 정리 후 {{ group.destination_after }}</p>
+<div class="table"><table><thead><tr><th>출발 위치</th><th>출발 전 → 후</th><th>이동량</th><th>도착 위치</th><th>도착 전 → 후</th><th>공간·조건 확인</th><th>작업 완료 / 작업자 / 시각</th><th class="no-print">이동 요청</th></tr></thead><tbody>
+{% for move in group.moves %}<tr><td>{{ move.source.location }}</td><td>{{ move.source.quantity }} → 0</td><td>{{ move.source.quantity }}</td><td>{{ group.destination }}</td><td>{{ move.destination_before }} → {{ move.destination_after }}</td><td>□ 확인</td><td>□ 완료 / __________ / __________</td><td class="no-print">{% for stock in move.source.stocks %}<a href="{% url 'movement-create' stock.pk %}?destination={{ group.destination|urlencode }}&amp;quantity={{ stock.quantity }}">{{ stock.quantity }}개 이동 요청</a>{% if not forloop.last %}<br>{% endif %}{% endfor %}</td></tr>{% endfor %}
+</tbody></table></div></section>{% empty %}<p>현재 조건에 맞는 정리 후보가 없습니다.</p>{% endfor %}
+<p>정기 자동 출력은 설정하지 않습니다. 필요할 때 최신 목록을 조회·인쇄하세요. 도착 수량은 위에서 아래로 작업할 때의 예상값입니다.</p>
+<style>@media print{.cleanup-group{break-inside:avoid}.notice{font-size:9pt}h2{font-size:12pt}thead{display:table-header-group}}</style>
+{% endblock %}

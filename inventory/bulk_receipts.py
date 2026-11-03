@@ -1,3 +1,4 @@
+from .menu_permissions import require_menu_write
 import uuid
 from django.core.exceptions import ValidationError
 from .tabular import read_table, cell, integer
@@ -29,6 +30,7 @@ def parse_receipts(*, pasted='', upload=None):
 
 @warehouse_transaction
 def receive_batch(*, request_id, rows, actor):
+    require_menu_write(actor, 'receiving')
     # Normalize again, including signed preview data. Keep repeated code/location
     # rows as individual receipts so each original line remains traceable.
     normalized = parse_receipts(pasted='\n'.join('\t'.join(str(r[k]) for k in ['code','name','specification','quantity','location']) for r in rows))

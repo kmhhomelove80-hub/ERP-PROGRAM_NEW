@@ -4,6 +4,7 @@ from django.urls import path
 from inventory import views, production_views
 from .auth_views import WarehouseLoginView
 urlpatterns = [
+    path('notifications/movements/',views.movement_notifications,name='movement-notifications'),
     path('production/',production_views.production_plan,name='production-plan'),
     path('production/settings/',production_views.production_settings,name='production-settings'),
     path('admin/',admin.site.urls),
@@ -21,6 +22,8 @@ urlpatterns = [
     path('substitutions/<uuid:pk>/',views.substitution_detail,name='substitution-detail'),
     path('picking/<uuid:pk>/customer/',views.customer_picking_print,name='customer-picking-print'),
     path('picking/<uuid:pk>/',views.picking_detail,name='picking-detail'),
+    path('allocations/<uuid:pk>/reassign/',views.allocation_reassign,name='allocation-reassign'),
+    path('cleanup/',views.cleanup_list,name='cleanup-list'),
     path('allocations/',views.allocation_list,name='allocation-list'),
     path('movements/',views.movement_list,name='movement-list'),
     path('movements/<uuid:pk>/',views.movement_detail,name='movement-detail'),

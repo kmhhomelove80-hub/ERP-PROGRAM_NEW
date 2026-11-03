@@ -1,5 +1,10 @@
 def event_summary(event):
     d = event.detail
+    if event.action == 'allocation_reassign':
+        before = d.get('before', {})
+        source = before.get('details', {}).get('location', '')
+        after = ' / '.join(f"{r.get('details',{}).get('location','')} {r.get('quantity',0)}개" for r in d.get('after', []))
+        return f"{source} {before.get('quantity',0)}개 → {after} · {d.get('reason','')}"
     if event.action.startswith('substitution_'):
         return f"{d.get('requested_code','')} ← {d.get('actual_code','')}" + (f" · {d['quantity']}개" if 'quantity' in d else '') + f" · {d.get('note',d.get('reason',''))}"
     if event.action in ['movement','movement_requested']:

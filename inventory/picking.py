@@ -1,3 +1,4 @@
+from .menu_permissions import require_menu_write, can_write
 """Picking input, deterministic preview and atomic confirmation."""
 from collections import OrderedDict
 from django.core.exceptions import ValidationError
@@ -28,25 +29,45 @@ def parse_paste(text):
         if rows[code] > MAX_QUANTITY: raise ValidationError(f'{n}행: 합산 수량이 허용 범위를 초과합니다.')
     return [{'code':code,'quantity':qty} for code,qty in rows.items()]
 
-def plan_picking(rows, *, received_only=False):
+def plan_picking(rows, *, received_only=False, manual=None):
     available = {}
-    # Original Excel scans stock rows in their original order. Initial import
-    # preserves that order as PK; do not imply FIFO or location optimization.
-    stocks = Stock.objects.select_related('item').filter(warehouse='Y09',quantity__gt=F('reserved'),item__code__in=[r['code'] for r in rows]).order_by('pk')
+    from .location_planner import choose_locations, MAX_TRANSITIONS
+    work_budget = [MAX_TRANSITIONS]
+    stocks = Stock.objects.select_related('item').filter(warehouse='Y09',quantity__gt=F('reserved'),item__code__in=[r['code'] for r in rows]).order_by('location','pk')
     if received_only:
         stocks = stocks.filter(status=Stock.Status.RECEIVED)
-    for s in stocks: available.setdefault(s.item.code,[]).append(s)
+    # Python code-point ordering is identical on SQLite and PostgreSQL locales.
+    for s in sorted(stocks, key=lambda stock:(stock.location, stock.pk)):
+        available.setdefault(s.item.code,[]).append(s)
+    manual = dict(manual) if manual is not None else None
+    if manual is not None and set(manual) - {s.pk for group in available.values() for s in group}:
+        raise ValidationError('수동 배정 대상은 같은 품목의 가용 재고여야 합니다.')
     allocations, shortages = [], []
     for row in rows:
-        remaining = row['quantity']
-        for s in available.get(row['code'],[]):
-            qty = min(remaining,s.available)
+        candidates = available.get(row['code'], [])
+        target = min(row['quantity'], sum(s.available for s in candidates))
+        if manual is None:
+            locations = OrderedDict()
+            for stock in candidates: locations.setdefault(stock.location, []).append(stock)
+            groups = list(locations.values())
+            selected = choose_locations([sum(s.available for s in group) for group in groups], row['quantity'], budget=work_budget)
+            selected_stocks = [s for i in selected for s in groups[i]]
+        else:
+            selected_stocks = [s for s in candidates if s.pk in manual]
+            if sum(manual[s.pk] for s in selected_stocks) != target:
+                raise ValidationError(f"{row['code']}: 수동 배정 합계는 현재 배정 가능 수량 {target}개여야 합니다.")
+        remaining = target
+        for stock in selected_stocks:
+            qty = min(remaining, stock.available) if manual is None else manual[stock.pk]
+            if manual is None and qty == 0:
+                continue
+            if isinstance(qty, bool) or not isinstance(qty, int) or not 0 < qty <= stock.available:
+                raise ValidationError('수동 배정 수량이 가용량을 초과하거나 유효하지 않습니다.')
             if qty:
-                allocations.append({'stock_id':s.pk,'code':row['code'],'model':s.legacy_name or s.item.name,'specification':s.legacy_specification or s.item.specification,'location':s.location,'status':s.status,'quantity':qty})
+                allocations.append({'stock_id':stock.pk,'code':row['code'],'model':stock.legacy_name or stock.item.name,'specification':stock.legacy_specification or stock.item.specification,'location':stock.location,'status':stock.status,'quantity':qty})
                 remaining -= qty
-            if remaining == 0: break
-        if remaining:
-            shortages.append({'code':row['code'],'requested':row['quantity'],'allocated':row['quantity']-remaining,'shortage':remaining})
+        if target < row['quantity']:
+            shortages.append({'code':row['code'],'requested':row['quantity'],'allocated':target,'shortage':row['quantity']-target})
     from .reconciliation import latest_reference
     reference,snapshot=latest_reference('Y02',[r['code'] for r in shortages])
     for row in shortages:
@@ -55,12 +76,14 @@ def plan_picking(rows, *, received_only=False):
     return {'allocations':allocations,'shortages':shortages}
 
 @warehouse_transaction
-def confirm_picking(*, request_id, project, rows, preview, allow_shortage, actor, customer_rows=None, substitution_draft=False):
+def confirm_picking(*, request_id, project, rows, preview, allow_shortage, actor, customer_rows=None, substitution_draft=False, manual=None):
+    require_menu_write(actor, 'shipping')
     project = project.strip()
     if not project or len(project)>250: raise ValidationError('프로젝트/호선 이름이 필요합니다.')
     # Normalize again at the service boundary, not only in HTML forms.
     normalized = parse_paste('\n'.join(f"{r['code']}\t{r['quantity']}" for r in rows))
     payload = {'project':project,'rows':normalized}
+    if manual is not None: payload['manual'] = sorted([[int(k), v] for k,v in dict(manual).items()])
     if substitution_draft: payload['substitution_draft']=True
     if customer_rows:
         from .customer_picking import parse_customer
@@ -73,7 +96,7 @@ def confirm_picking(*, request_id, project, rows, preview, allow_shortage, actor
         if previous.actor_id != actor.pk or previous.payload != payload:
             raise ValidationError('이미 사용한 요청번호입니다.')
         return previous
-    current = plan_picking(normalized)
+    current = plan_picking(normalized, manual=manual)
     if current != preview:
         raise ValidationError('재고 또는 위치가 변경되었습니다. 배정 미리보기를 다시 확인하세요.')
     if not current['allocations'] and not (substitution_draft and allow_shortage): raise ValidationError('예약 가능한 수량이 없습니다. 전량 부족이면 대체 배정용 주문으로 등록하세요.')
@@ -82,6 +105,8 @@ def confirm_picking(*, request_id, project, rows, preview, allow_shortage, actor
     order = PickingOrder.objects.create(id=request_id,project=project,actor=actor,payload=payload,shortages=current['shortages'])
     for row in current['allocations']:
         stock = Stock.objects.select_for_update().get(pk=row['stock_id'])
+        if row['quantity'] > stock.available:
+            raise ValidationError('가용량이 변경되었습니다. 다시 확인하세요.')
         stock.reserved += row['quantity']
         stock.save(update_fields=['reserved'])
         allocation = Allocation.objects.create(stock=stock,order=order,project=project,quantity=row['quantity'],assigned_details=stock_details(stock))
@@ -133,7 +158,7 @@ def confirm_supplement(*, request_id, order_id, preview, allow_shortage, confirm
     """Append reservations atomically, retaining the original demand and shortage snapshot."""
     import uuid
     from .models import AuditEvent
-    if not actor.is_active or not actor.is_staff:
+    if not can_write(actor, 'shipping'):
         raise ValidationError('모든 권한 계정만 추가 피킹을 확정할 수 있습니다.')
     if not confirmed:
         raise ValidationError('기존 주문과 추가 배정 수량을 확인하세요.')

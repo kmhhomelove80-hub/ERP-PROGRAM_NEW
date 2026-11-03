@@ -11,7 +11,7 @@ from .services import reserve, process_movement
 @skipUnless(connection.vendor == 'postgresql','실제 PostgreSQL에서만 동시성 검증')
 class PostgreSQLConcurrencyTests(TransactionTestCase):
     def setUp(self):
-        self.user = get_user_model().objects.create_user('concurrent')
+        self.user = get_user_model().objects.create_user('concurrent',is_staff=True)
         self.item = Item.objects.create(code='CONCURRENT')
         self.stock = Stock.objects.create(item=self.item,location='A',quantity=10)
     def parallel(self,functions):

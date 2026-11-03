@@ -2,24 +2,19 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, F
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import Stock
-from .access import warehouse_access, warehouse_write
+from .access import warehouse_access, warehouse_write, menu_access
+from .menu_permissions import can_write
 from .forms import ReceiptForm, ArrivalForm
 from .services import receive_stock, confirm_arrival
 
 @login_required
 def stock_list(request):
-    query = request.GET.get('q','').strip()
-    status = request.GET.get('status','')
-    scan_mode = '1' if request.GET.get('scan') == '1' and query else ''
-    stocks = Stock.objects.select_related('item').filter(quantity__gt=0).order_by('item__code','location','pk')
-    if scan_mode:
-        stocks = stocks.filter(item__code__iexact=query)
-    elif query:
-        stocks = stocks.filter(Q(item__code__icontains=query)|Q(item__name__icontains=query)|Q(item__specification__icontains=query)|Q(location__icontains=query)|Q(legacy_name__icontains=query)|Q(legacy_specification__icontains=query))
-    if status in Stock.Status.values: stocks = stocks.filter(status=status)
+    from .stock_search import search_stocks
+    stocks, filters = search_stocks(request.GET)
+    query, status, scan_mode = filters['q'], filters['status'], filters['scan']
     # Sort the full filtered queryset before pagination; never accept SQL field names.
     from django.db.models import F, Min, Value
     from django.db.models.functions import Coalesce
@@ -40,7 +35,7 @@ def stock_list(request):
         sort_headers.append({'label': label, 'key': key, 'active': active,
                              'arrow': '↑' if direction == 'asc' else '↓',
                              'aria': ('ascending' if direction == 'asc' else 'descending') if active else 'none',
-                             'url': '?' + urlencode({'q': query, 'status': status, 'sort': key, 'direction': next_direction, 'scan': scan_mode})})
+                             'url': '?' + urlencode({'q': query, 'status': status, 'sort': key, 'direction': next_direction, 'scan': scan_mode, 'model': filters['model'], 'spec': filters['spec']})})
     totals = stocks.aggregate(quantity=Sum('quantity'),reserved=Sum('reserved'))
     totals['available'] = (totals['quantity'] or 0) - (totals['reserved'] or 0)
     from .models import Item
@@ -55,9 +50,9 @@ def stock_list(request):
     from .reconciliation import latest_reference
     reference,erp_snapshot=latest_reference('Y09',[s.item.code for s in page.object_list])
     for stock in page.object_list:stock.erp_pending=reference.get(stock.item.code,{}).get('shipping_pending')
-    return render(request,'inventory/stock_results.html' if request.GET.get('partial')=='1' else 'inventory/stock_list.html',{'page_obj':page, 'query':query,'status':status,'totals':totals,'statuses':Stock.Status.choices,'erp_snapshot':erp_snapshot,'sort':sort,'direction':direction,'sort_headers':sort_headers,'scan_mode':scan_mode,'scan_item_exists':scan_item_exists})
+    return render(request,'inventory/stock_results.html' if request.GET.get('partial')=='1' else 'inventory/stock_list.html',{'page_obj':page, 'query':query,'status':status,'totals':totals,'statuses':Stock.Status.choices,'erp_snapshot':erp_snapshot,'sort':sort,'direction':direction,'sort_headers':sort_headers,'scan_mode':scan_mode,'scan_item_exists':scan_item_exists,'model_query':filters['model'],'spec_query':filters['spec']})
 
-@warehouse_access
+@menu_access('receiving')
 def receipt_create(request):
     form = ReceiptForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
@@ -73,7 +68,7 @@ def receipt_create(request):
             return redirect('stock-list')
     return render(request,'inventory/receipt_create.html',{'form':form,'title':'입고 / 예정 재고 등록','description':'새 물량을 등록합니다. 이미 등록한 예정 물량이 도착했다면 재고 목록의 입고 확인을 사용하세요.'})
 
-@warehouse_access
+@menu_access('receiving')
 def arrival_confirm(request, pk):
     stock = get_object_or_404(Stock.objects.select_related('item'),pk=pk,status='expected',quantity__gt=0)
     form = ArrivalForm(request.POST or None)
@@ -85,45 +80,62 @@ def arrival_confirm(request, pk):
             return redirect('stock-list')
     return render(request,'inventory/form.html',{'form':form,'title':'예정 재고 도착 확인','description':f'{stock.item.code} · {stock.location} · 전량 {stock.quantity}개 / 예약 {stock.reserved}개를 실제 위치로 전환합니다.'})
 
-@warehouse_access
+@menu_access('shipping')
 def picking_create(request):
     from django.core import signing
+    from uuid import UUID
     from .forms import PickingInputForm, PickingConfirmForm
     from .picking import plan_picking, confirm_picking
-    input_form = PickingInputForm(request.POST if request.method == 'POST' and request.POST.get('action') == 'preview' else None, request.FILES or None)
-    preview, confirm_form = None, None
-    totals = None
-    if request.method == 'POST' and request.POST.get('action') == 'preview' and input_form.is_valid():
-        d = input_form.cleaned_data
-        preview = plan_picking(d['pasted_rows'])
-        from .picking_totals import picking_totals
-        totals = picking_totals(d['pasted_rows'], preview['allocations'])
-        payload = dict(actor=request.user.pk,request_id=str(d['request_id']),project=d['project'],rows=d['pasted_rows'],preview=preview,customer_rows=d.get('customer_details',[]))
-        token = signing.dumps(payload,salt='picking-preview',compress=True)
-        confirm_form = PickingConfirmForm(initial={'preview_token':token})
-    elif request.method == 'POST' and request.POST.get('action') == 'confirm':
-        confirm_form = PickingConfirmForm(request.POST)
-        if confirm_form.is_valid():
-            try:
-                payload = signing.loads(confirm_form.cleaned_data['preview_token'],salt='picking-preview',max_age=1800)
-                if payload['actor'] != request.user.pk: raise ValidationError('다른 사용자의 미리보기입니다.')
-                initial={'request_id':payload['request_id'],'project':payload['project']}
+    from .reassignment import parse_targets
+    from .picking_totals import picking_totals
+    action = request.POST.get('action')
+    input_form = PickingInputForm(request.POST if request.method == 'POST' and action == 'preview' else None, request.FILES or None)
+    preview, confirm_form, totals, candidates, payload = None, None, None, [], None
+    if request.method == 'POST':
+        try:
+            if action == 'preview' and input_form.is_valid():
+                d = input_form.cleaned_data
+                payload = dict(actor=request.user.pk,request_id=str(d['request_id']),project=d['project'],rows=d['pasted_rows'],customer_rows=d.get('customer_details',[]))
+                try:
+                    payload['preview'] = plan_picking(payload['rows'])
+                except ValidationError as error:
+                    # A manual path remains available even when exact optimization hits its cap.
+                    messages.warning(request, ' / '.join(error.messages))
+                    payload['preview'] = None
+            elif action in ('adjust', 'confirm'):
+                form = PickingConfirmForm(request.POST)
+                if not form.is_valid():
+                    raise ValidationError('미리보기 정보가 유효하지 않습니다. 다시 계산하세요.')
+                payload = signing.loads(form.cleaned_data['preview_token'],salt='picking-preview',max_age=1800)
+                if payload['actor'] != request.user.pk:
+                    raise ValidationError('다른 사용자의 미리보기입니다.')
+                initial = {'request_id':payload['request_id'], 'project':payload['project']}
                 if payload.get('customer_rows'):
-                    initial['customer_rows']='\n'.join('\t'.join(str(r[k]) for k in ['por','hull','block','name','quantity','code']) for r in payload['customer_rows'])
+                    initial['customer_rows'] = '\n'.join('\t'.join(str(r[k]) for k in ['por','hull','block','name','quantity','code']) for r in payload['customer_rows'])
                 else:
-                    initial['pasted_rows']='\n'.join(f"{r['quantity']}\t{r['code']}" for r in payload['rows'])
+                    initial['pasted_rows'] = '\n'.join(f"{r['quantity']}\t{r['code']}" for r in payload['rows'])
                 input_form = PickingInputForm(initial=initial)
-                from uuid import UUID
-                order = confirm_picking(request_id=UUID(payload['request_id']),project=payload['project'],rows=payload['rows'],preview=payload['preview'],allow_shortage=confirm_form.cleaned_data['allow_shortage'],actor=request.user,customer_rows=payload.get('customer_rows',[]),substitution_draft=request.POST.get('substitution_draft')=='1')
-            except (signing.BadSignature,ValidationError) as error:
-                messages.error(request,' / '.join(error.messages) if isinstance(error,ValidationError) else '미리보기가 만료되었거나 유효하지 않습니다. 다시 계산하세요.')
-                confirm_form = None
-            else:
-                messages.success(request,'피킹 예약을 등록했습니다. 재고 차감은 실제 출고 후 Release에서 수행하세요.')
-                return redirect('picking-detail',pk=order.pk)
-    return render(request,'inventory/picking_create.html',{'input_form':input_form,'preview':preview,'confirm_form':confirm_form,'totals':totals})
+                if action == 'adjust':
+                    manual = parse_targets(request.POST.get('manual_targets',''))
+                    payload['preview'] = plan_picking(payload['rows'], manual=manual)
+                    payload['manual'] = sorted([[k,v] for k,v in manual.items()])
+                else:
+                    if payload['preview'] is None:
+                        raise ValidationError('수동 위치 배정 미리보기를 먼저 확인하세요.')
+                    order = confirm_picking(request_id=UUID(payload['request_id']),project=payload['project'],rows=payload['rows'],preview=payload['preview'],allow_shortage=form.cleaned_data['allow_shortage'],actor=request.user,customer_rows=payload.get('customer_rows',[]),substitution_draft=request.POST.get('substitution_draft')=='1',manual=payload.get('manual'))
+                    messages.success(request,'피킹 예약을 등록했습니다. 재고 차감은 실제 출고 후 Release에서 수행하세요.')
+                    return redirect('picking-detail',pk=order.pk)
+        except (signing.BadSignature, ValidationError) as error:
+            messages.error(request,' / '.join(error.messages) if isinstance(error,ValidationError) else '미리보기가 만료되었거나 유효하지 않습니다. 다시 계산하세요.')
+            payload = None
+    if payload is not None:
+        preview = payload['preview']
+        totals = picking_totals(payload['rows'], preview['allocations']) if preview else None
+        confirm_form = PickingConfirmForm(initial={'preview_token': signing.dumps(payload,salt='picking-preview',compress=True)})
+        candidates = Stock.objects.select_related('item').filter(warehouse='Y09', item__code__in=[r['code'] for r in payload['rows']], quantity__gt=F('reserved')).order_by('item__code','location','pk')
+    return render(request,'inventory/picking_create.html',{'input_form':input_form,'preview':preview,'confirm_form':confirm_form,'totals':totals,'candidates':candidates})
 
-@warehouse_access
+@menu_access('shipping')
 def picking_detail(request, pk):
     from .models import PickingOrder
     order = get_object_or_404(PickingOrder,pk=pk)
@@ -136,7 +148,7 @@ def picking_detail(request, pk):
         totals = order_totals(order, rows)
     return render(request,'inventory/picking_detail.html',{'order':order,'allocations':rows,'balance':balance,'totals':totals})
 
-@warehouse_access
+@menu_access('shipping')
 def allocation_list(request):
     from django.core import signing
     from .models import Allocation
@@ -153,16 +165,25 @@ def allocation_list(request):
         data=form.cleaned_data
         ids=list(data['allocations'].values_list('pk',flat=True))
         try:
-            if request.POST.get('scope')=='filtered':
-                payload=signing.loads(request.POST.get('filter_token',''),salt='allocation-filter',max_age=1800)
-                if payload['actor']!=request.user.pk or payload['q']!=query or payload['seq']!=seq:
-                    raise ValidationError('필터가 변경되었습니다. 다시 조회하세요.')
-                ids=payload['ids']
-                if set(map(str,rows.values_list('pk',flat=True)))!=set(ids):
-                    raise ValidationError('필터 결과가 변경되었습니다. 다시 조회하고 대상 행을 확인하세요.')
-            if not ids: raise ValidationError('처리할 행을 선택하세요.')
-            if data['action']=='release': release_selected(allocation_ids=ids,shipped_at=data['shipped_at'],actor=request.user)
-            else: cancel_selected(allocation_ids=ids,actor=request.user)
+            from .locking import warehouse_lock
+            with warehouse_lock():
+                payload = None
+                if request.POST.get('filter_token') or request.POST.get('scope') == 'filtered':
+                    payload=signing.loads(request.POST.get('filter_token',''),salt='allocation-filter',max_age=1800)
+                    if payload['actor']!=request.user.pk or payload['q']!=query or payload['seq']!=seq:
+                        raise ValidationError('필터가 변경되었습니다. 다시 조회하세요.')
+                if request.POST.get('scope')=='filtered':
+                    ids=payload['ids']
+                    if set(map(str,rows.values_list('pk',flat=True)))!=set(ids):
+                        raise ValidationError('필터 결과가 변경되었습니다. 다시 조회하고 대상 행을 확인하세요.')
+                if not ids: raise ValidationError('처리할 행을 선택하세요.')
+                if payload is not None:
+                    current = {str(a.pk):[a.stock_id,a.quantity] for a in rows.filter(pk__in=ids)}
+                    expected = {str(pk):payload.get('versions',{}).get(str(pk)) for pk in ids}
+                    if current != expected:
+                        raise ValidationError('예약 위치·수량 또는 필터 결과가 변경되었습니다. 다시 조회하고 실제 출고 대상을 확인하세요.')
+                if data['action']=='release': release_selected(allocation_ids=ids,shipped_at=data['shipped_at'],actor=request.user)
+                else: cancel_selected(allocation_ids=ids,actor=request.user)
         except (signing.BadSignature,ValidationError) as error:
             form.add_error(None,error if isinstance(error,ValidationError) else '필터 미리보기가 만료되었습니다. 다시 조회하세요.')
         else:
@@ -170,17 +191,18 @@ def allocation_list(request):
             from django.urls import reverse
             from urllib.parse import urlencode
             return redirect(reverse('allocation-list')+'?'+urlencode({'q':query,'seq':seq}))
-    ids=list(map(str,rows.values_list('pk',flat=True)))
-    token=signing.dumps(dict(actor=request.user.pk,q=query,seq=seq,ids=ids),salt='allocation-filter',compress=True)
+    versions = {str(pk):[stock_id,quantity] for pk,stock_id,quantity in rows.values_list('pk','stock_id','quantity')}
+    ids=list(versions)
+    token=signing.dumps(dict(actor=request.user.pk,q=query,seq=seq,ids=ids,versions=versions),salt='allocation-filter',compress=True)
     page=Paginator(rows,50).get_page(request.GET.get('page'))
     return render(request,'inventory/allocations.html',{'form':form,'allocations':page,'page_obj':page,'query':query,'seq':seq,'total':len(ids),'filter_token':token,'selected_ids':request.POST.getlist('allocations')})
 
-@warehouse_write
+@login_required
 def movement_create(request, pk):
     from .forms import MovementRequestForm
     from .services import submit_movement
     stock = get_object_or_404(Stock.objects.select_related('item'),pk=pk)
-    form = MovementRequestForm(request.POST or None)
+    form = MovementRequestForm(request.POST or None, initial={'destination': request.GET.get('destination',''), 'quantity': request.GET.get('quantity','')})
     if request.method == 'POST' and form.is_valid():
         d = form.cleaned_data
         try: movement = submit_movement(request_id=d['request_id'],source_id=stock.pk,destination=d['destination'],quantity=d['quantity'],actor=request.user)
@@ -208,9 +230,9 @@ def movement_detail(request, pk):
     from .services import process_movement
     from django.core.exceptions import PermissionDenied
     movement = get_object_or_404(MovementRequest.objects.select_related('source__item','requested_by','processed_by'),pk=pk)
-    form = MovementProcessForm(request.POST or None) if request.user.is_staff and movement.state=='pending' else None
+    form = MovementProcessForm(request.POST or None) if can_write(request.user, 'inventory') and movement.state=='pending' else None
     if request.method == 'POST':
-        if not request.user.is_staff: raise PermissionDenied
+        if not can_write(request.user, 'inventory'): raise PermissionDenied
         if form is not None and form.is_valid():
             data = form.cleaned_data
             process_movement(request_id=movement.pk,actor=request.user,rejection_reason=data['reason'] if data['action']=='reject' else '')
@@ -345,7 +367,7 @@ def archive_list(request):
     for record in page.object_list:record.original_display=json.dumps(record.payload,ensure_ascii=False,indent=2)
     return render(request,'inventory/archives.html',{'page_obj':page,'kind':kind,'query':query,'kinds':LegacyArchiveRecord._meta.get_field('kind').choices})
 
-@warehouse_access
+@menu_access('receiving')
 def receipt_list(request):
     from .models import Receipt
     query=request.GET.get('q','').strip()
@@ -353,7 +375,7 @@ def receipt_list(request):
     if query:rows=rows.filter(Q(stock__item__code__icontains=query)|Q(stock__location__icontains=query))
     return render(request,'inventory/receipts.html',{'page_obj':Paginator(rows,50).get_page(request.GET.get('page')),'query':query})
 
-@warehouse_access
+@menu_access('receiving')
 def receipt_cancel(request,pk):
     from .models import Receipt
     from .forms import ReceiptCancelForm
@@ -374,7 +396,7 @@ def operations_status(request):
     from django.conf import settings
     return render(request,'inventory/operations.html',{'report':readiness_report(deployment=not settings.DEBUG),'debug':settings.DEBUG})
 
-@warehouse_access
+@menu_access('shipping')
 def picking_list(request):
     from .models import PickingOrder
     from django.db.models import Count
@@ -389,7 +411,7 @@ def picking_list(request):
     else:status=''
     return render(request,'inventory/picking_list.html',{'page_obj':Paginator(rows,30).get_page(request.GET.get('page')),'query':query,'status':status})
 
-@warehouse_access
+@menu_access('shipping')
 def allocation_history(request):
     from .models import Allocation
     query=request.GET.get('q','').strip()
@@ -409,11 +431,8 @@ def stock_export(request):
     from .exports import workbook_bytes,MAX_EXPORT_ROWS
     from .reconciliation import latest_reference
     from .locking import warehouse_lock
-    query=request.GET.get('q','').strip();status=request.GET.get('status','')
-    rows=Stock.objects.select_related('item').filter(quantity__gt=0).order_by('item__code','location','pk')
-    if query and request.GET.get('scan') == '1':rows=rows.filter(item__code__iexact=query)
-    elif query:rows=rows.filter(Q(item__code__icontains=query)|Q(item__name__icontains=query)|Q(item__specification__icontains=query)|Q(location__icontains=query)|Q(legacy_name__icontains=query)|Q(legacy_specification__icontains=query))
-    if status in Stock.Status.values:rows=rows.filter(status=status)
+    from .stock_search import search_stocks
+    rows, filters = search_stocks(request.GET)
     with warehouse_lock():
         if rows.count()>MAX_EXPORT_ROWS:return HttpResponse('검색 범위를 좁혀주세요. 내보내기 행 수 제한을 초과했습니다.',status=400)
         reference,snapshot=latest_reference('Y09',list(rows.values_list('item__code',flat=True)))
@@ -446,7 +465,7 @@ def erp_export(request,pk):
     return response
 
 
-@warehouse_access
+@menu_access('shipping')
 def customer_picking_print(request, pk):
     from .models import PickingOrder
     from .customer_picking import customer_print_groups
@@ -459,7 +478,7 @@ def customer_picking_print(request, pk):
     return render(request,'inventory/customer_picking_print.html',{'order':order,'groups':groups,'totals':totals})
 
 
-@warehouse_access
+@menu_access('receiving')
 def receipt_bulk(request):
     from django.core import signing
     from .forms import BulkReceiptForm, ErpConfirmForm
@@ -495,7 +514,7 @@ def receipt_bulk(request):
     return render(request,'inventory/receipt_bulk.html',{'form':form,'preview':preview,'confirm_form':confirm_form,'warnings':locals().get('warnings',[])})
 
 
-@warehouse_access
+@menu_access('shipping')
 def substitution_create(request, pk):
     from .models import PickingOrder
     from .forms import SubstitutionForm
@@ -512,7 +531,7 @@ def substitution_create(request, pk):
     return render(request,'inventory/form.html',{'form':form,'title':f'{order.project} 대체품 배정','description':'현재 미배정 수량을 다른 코드로 1:1 배정합니다. 이 단계는 예약이며 실물 차감은 대체 출고(빌림) 때 수행합니다.'})
 
 
-@warehouse_access
+@menu_access('shipping')
 def substitution_detail(request, pk):
     from .models import Substitution
     from .forms import SubstitutionDispatchForm,SubstitutionSettlementForm,SubstitutionErpForm,SubstitutionCancelForm
@@ -541,7 +560,7 @@ def substitution_detail(request, pk):
     return render(request,'inventory/substitution_detail.html',{'record':record,'repaid':repaid,'outstanding':record.allocation.quantity-repaid,'dispatch_form':dispatch_form,'cancel_form':cancel_form,'settlement_form':settlement_form,'erp_form':erp_form,'settlements':record.settlements.select_related('receipt','actor').order_by('created_at','pk')})
 
 
-@warehouse_access
+@menu_access('shipping')
 def substitution_list(request):
     from .models import Substitution,ErpSnapshot
     from .substitutions import related_for_snapshot,repaid_quantity
@@ -578,7 +597,7 @@ def stock_allocations(request, pk):
     return render(request,'inventory/stock_allocations.html',{'stock':stock,'page_obj':page,'allocated_total':total,'matches':total==stock.reserved})
 
 
-@warehouse_write
+@menu_access('shipping', write=True)
 def picking_supplement(request, pk):
     import uuid
     from django.core import signing
@@ -644,3 +663,57 @@ def user_manual_pdf(request):
         raise Http404('PDF 매뉴얼이 없습니다. 프로그램 배포 파일을 확인해 주세요.') from error
     return FileResponse(document, content_type='application/pdf', filename='SUNIL_ERP_Manual.pdf',
                         as_attachment=request.GET.get('download') == '1')
+
+
+@menu_access('shipping', write=True)
+def allocation_reassign(request, pk):
+    from django.core import signing
+    from .models import Allocation
+    from .forms import ReassignmentForm
+    from .reassignment import allocation_snapshot, reassign_allocation
+    allocation = get_object_or_404(Allocation.objects.select_related('stock__item'), pk=pk)
+    if allocation.state != 'reserved':
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied('출고·취소 완료 내역은 변경할 수 없습니다.')
+    snapshot = allocation_snapshot(allocation)
+    token = signing.dumps(dict(actor=request.user.pk, allocation=str(pk), snapshot=snapshot), salt='reassign')
+    form = ReassignmentForm(request.POST or None, initial={'snapshot_token':token,'targets':f'{allocation.stock_id} {allocation.quantity}'})
+    if request.method == 'POST' and form.is_valid():
+        try:
+            payload = signing.loads(form.cleaned_data['snapshot_token'],salt='reassign',max_age=1800)
+            if payload['actor'] != request.user.pk or payload['allocation'] != str(pk):
+                raise ValidationError('변경 화면의 사용자 또는 예약이 다릅니다.')
+            reassign_allocation(allocation_id=pk, targets=form.cleaned_data['targets'], expected=payload['snapshot'],
+                request_id=form.cleaned_data['request_id'], reason=form.cleaned_data['reason'], actor=request.user)
+        except (signing.BadSignature, ValidationError) as error:
+            form.add_error(None,error if isinstance(error,ValidationError) else '변경 화면이 만료되었습니다. 다시 열어 주세요.')
+        else:
+            messages.success(request,'예약 위치와 수량을 변경하고 이력을 기록했습니다.')
+            return redirect('picking-detail',pk=allocation.order_id) if allocation.order_id else redirect('allocation-list')
+    candidates = list(Stock.objects.select_related('item').filter(item=allocation.stock.item,warehouse=allocation.stock.warehouse).order_by('location','pk'))
+    for stock in candidates:
+        stock.reassign_available = stock.available + (allocation.quantity if stock.pk == allocation.stock_id else 0)
+    return render(request,'inventory/allocation_reassign.html',{'allocation':allocation,'form':form,'candidates':candidates})
+
+
+@login_required
+def cleanup_list(request):
+    from .cleanup import cleanup_candidates
+    from django.utils import timezone
+    from .locking import warehouse_lock
+    with warehouse_lock():
+        groups = cleanup_candidates(request.GET.get('q','').strip())
+    return render(request,'inventory/cleanup.html',{'groups':groups,'generated_at':timezone.now(),'query':request.GET.get('q','').strip()})
+
+
+@menu_access('inventory', write=True)
+def movement_notifications(request):
+    from django.http import JsonResponse
+    from django.views.decorators.cache import never_cache
+    from .models import MovementRequest
+    if request.method != 'GET':
+        from django.http import HttpResponseNotAllowed
+        return HttpResponseNotAllowed(['GET'])
+    response = JsonResponse({'pending': MovementRequest.objects.filter(state='pending').count()})
+    response['Cache-Control'] = 'no-store, private'
+    return response

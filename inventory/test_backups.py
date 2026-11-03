@@ -1,3 +1,4 @@
+from contextlib import closing
 from pathlib import Path
 import tempfile
 import sqlite3
@@ -18,7 +19,7 @@ class SQLiteBackupTests(TransactionTestCase):
             verify_backup(backup)
             target=Path(directory)/'restored.sqlite3'
             restore_backup(backup,sqlite_target=target)
-            with sqlite3.connect(target) as restored:
+            with closing(sqlite3.connect(target)) as restored:
                 self.assertEqual(restored.execute('select quantity from inventory_stock').fetchone()[0],7)
                 self.assertEqual(restored.execute('select code from inventory_item').fetchone()[0],'BACKUP-001')
             with self.assertRaises(ValidationError):restore_backup(backup,sqlite_target=target)

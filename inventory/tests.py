@@ -8,7 +8,7 @@ from .services import reserve, release_selected, cancel_allocation, process_move
 
 class WorkflowTests(TestCase):
     def setUp(self):
-        self.user = get_user_model().objects.create_user('operator', password='test-only-password')
+        self.user = get_user_model().objects.create_user('operator', is_staff=True, password='test-only-password')
         self.item = Item.objects.create(code='ERP-001', name='시험등기구')
         self.stock = Stock.objects.create(item=self.item, location='A0101', quantity=20)
     def allocate(self, quantity=5, stock=None):
