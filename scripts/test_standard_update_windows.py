@@ -53,7 +53,7 @@ class NativeWindowsTests(unittest.TestCase):
                 if row:break
                 time.sleep(.2)
             self.assertIsNotNone(row);self.assertEqual(row['ProcessId'],process.pid)
-            self.assertIsInstance(row['CreationDate'],str);self.assertIn('T',row['CreationDate'])
+            self.assertIsInstance(row['CreationDate'],str);self.assertTrue(row['CreationDate'].startswith('ticks:'))
             self.ops.captured=row
             self.ops.check_process(row,captured=True)
             with self.assertRaises(RuntimeError):self.ops.check_process({**row,'CreationDate':'different'},captured=True)

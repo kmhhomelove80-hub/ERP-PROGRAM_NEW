@@ -344,7 +344,7 @@ class WindowsOps:
         return json.loads(output) if output.strip() else None
 
     def process(self):
-        rows=self.ps("$r=@(Get-NetTCPConnection -State Listen -ErrorAction Stop|Where-Object LocalPort -eq 8000); if(@($r|Where-Object LocalAddress -ne '127.0.0.1').Count){throw 'Unexpected listener'}; $ids=@($r|Select-Object -ExpandProperty OwningProcess -Unique); if($ids.Count -gt 1){throw 'Ambiguous process'}; if($ids.Count){Get-CimInstance Win32_Process -Filter ('ProcessId='+$ids[0])|Select-Object ProcessId,@{Name='CreationDate';Expression={$_.CreationDate.ToUniversalTime().ToString('o')}},ExecutablePath,CommandLine|ConvertTo-Json -Compress}")
+        rows=self.ps("$r=@(Get-NetTCPConnection -State Listen -ErrorAction Stop|Where-Object LocalPort -eq 8000); if(@($r|Where-Object LocalAddress -ne '127.0.0.1').Count){throw 'Unexpected listener'}; $ids=@($r|Select-Object -ExpandProperty OwningProcess -Unique); if($ids.Count -gt 1){throw 'Ambiguous process'}; if($ids.Count){Get-CimInstance Win32_Process -Filter ('ProcessId='+$ids[0])|Select-Object ProcessId,@{Name='CreationDate';Expression={'ticks:'+$_.CreationDate.ToUniversalTime().Ticks.ToString()}},ExecutablePath,CommandLine|ConvertTo-Json -Compress}")
         return rows
 
     def check_process(self, row, captured=False):
@@ -372,7 +372,7 @@ class WindowsOps:
             if self.process() is None: return
             time.sleep(1)
         current=self.process();self.check_process(current,captured=True)
-        self.ps("$v=$env:SUNIL_VALUES|ConvertFrom-Json; $p=Get-CimInstance Win32_Process -Filter ('ProcessId='+$v.pid); if($p -and $p.CreationDate.ToUniversalTime().ToString('o') -eq $v.created){Stop-Process -Id $v.pid -ErrorAction Stop}else{throw 'Process changed'}",values={'pid':current['ProcessId'],'created':str(current['CreationDate'])})
+        self.ps("$v=$env:SUNIL_VALUES|ConvertFrom-Json; $p=Get-CimInstance Win32_Process -Filter ('ProcessId='+$v.pid); if($p -and ('ticks:'+$p.CreationDate.ToUniversalTime().Ticks.ToString()) -eq $v.created){Stop-Process -Id $v.pid -ErrorAction Stop}else{throw 'Process changed'}",values={'pid':current['ProcessId'],'created':str(current['CreationDate'])})
         time.sleep(1)
         if self.process() is not None: raise RuntimeError('ERP가 중지되지 않았습니다.')
 
