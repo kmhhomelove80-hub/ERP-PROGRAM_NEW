@@ -30,7 +30,11 @@ class NativeWindowsTests(unittest.TestCase):
     def test_actual_dpapi_roundtrip_owner_check_and_no_secret_logs(self):
         vault=self.folder/'synthetic.clixml'
         self.ops.config_path.write_text(json.dumps({'SecretsPath':str(vault)}),encoding='utf-8')
-        self.ops.ps("$c=Get-Content -LiteralPath $env:SUNIL_CONFIG_PATH -Raw|ConvertFrom-Json; $v=[pscustomobject]@{OwnerSid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value;Secrets=@{ERP_SECRET_KEY=(ConvertTo-SecureString 'synthetic-key-not-real' -AsPlainText -Force);ERP_DB_PASSWORD=(ConvertTo-SecureString 'synthetic-password-not-real' -AsPlainText -Force)}}; $v|Export-Clixml -LiteralPath $c.SecretsPath")
+        try:
+            self.ops.ps("$c=Get-Content -LiteralPath $env:SUNIL_CONFIG_PATH -Raw|ConvertFrom-Json; $v=[pscustomobject]@{OwnerSid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value;Secrets=@{ERP_SECRET_KEY=(ConvertTo-SecureString 'synthetic-key-not-real' -AsPlainText -Force);ERP_DB_PASSWORD=(ConvertTo-SecureString 'synthetic-password-not-real' -AsPlainText -Force)}}; $v|Export-Clixml -LiteralPath $c.SecretsPath")
+        except RuntimeError as error:
+            diagnostic=(self.ops.run/'windows-command.stderr.log').read_text(encoding='utf-8')
+            raise RuntimeError('Synthetic fixture creation failed: '+diagnostic) from error
         result=self.ops.ps(u.VAULT_COMMAND,secret=True)
         self.assertEqual(result['ERP_SECRET_KEY'],'synthetic-key-not-real')
         self.assertEqual(result['ERP_DB_PASSWORD'],'synthetic-password-not-real')
