@@ -55,3 +55,9 @@ ERP_TEST_PYTHON=/path/to/erp/python ERP_CHROMIUM=/usr/bin/chromium python script
 ```
 
 로컬 SQLite 검증 결과: 216개 테스트 중 실행 항목 통과, PostgreSQL 전용 9개 건너뜀. Chromium에서 PC/모바일 가상 자료 시나리오 통과. 운영 PostgreSQL과 실제 서버 배포는 별도 반영이 필요합니다.
+
+## 기존 CI와 분리한 검증
+
+`Production plan checks`는 새 기능의 SQLite/PostgreSQL/Windows 테스트와 PC/모바일 브라우저 시나리오를 실행합니다. 기존 `ERP tests` 전체 검사도 유지합니다.
+
+기준 main 커밋 `d425d7176948e5b3b6fddbc0bbc98235bbb36ba8`에서도 PostgreSQL 매뉴얼 테스트 3개와 재고 정렬 기대값 테스트 1개, Windows SQLite 백업 복원 테스트 1개가 실패하는 것을 기존 실행 로그로 확인했습니다. 이번 PR에서도 동일한 기존 실패가 남아 있습니다. 생산계획 기능의 변경으로 이를 숨기거나 기존 테스트를 건너뛰지 않습니다.
