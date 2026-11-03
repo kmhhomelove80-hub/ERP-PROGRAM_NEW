@@ -99,7 +99,7 @@ w.save(sys.argv[1]);w.close()
                 assert page.locator('.primary-nav > details[open]').count()==1
                 box=menus.nth(index).locator('.nav-panel').bounding_box()
                 assert box['x']>=0 and box['x']+box['width']<=page.viewport_size['width'], 'mobile menu outside viewport'
-            page.locator('h1').click()
+            page.keyboard.press('Escape')
             assert page.locator('.primary-nav > details[open]').count()==0
             page.screenshot(path=str(artifacts/'mobile.png'),full_page=True)
             assert page.evaluate('document.documentElement.scrollWidth<=window.innerWidth')
