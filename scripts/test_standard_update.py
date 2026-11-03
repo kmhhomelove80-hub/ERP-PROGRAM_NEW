@@ -82,7 +82,7 @@ class StandardUpdateTests(unittest.TestCase):
         self.assertLess(self.ops.events.index('backup-before-stop'),self.ops.events.index('stop'))
         self.assertLess(self.ops.events.index('backup-stopped'),self.ops.events.index('migrate'))
         self.assertTrue(self.ops.schedule and self.ops.running)
-        self.assertEqual(json.loads((self.run/'journal.json').read_text())['phase'],'complete')
+        self.assertEqual(json.loads((self.run/'journal.json').read_text(encoding='utf-8'))['phase'],'complete')
         for entry in self.manifest['files']:self.assertEqual(u.digest(self.app/entry['path']),entry['sha256'])
     def test_failure_cases_restore_files_and_tasks_but_never_restore_database(self):
         # Separate fixture instances prevent one scenario from influencing another.
@@ -110,7 +110,7 @@ class StandardUpdateTests(unittest.TestCase):
         self.assert_original()
     def test_damaged_rollback_is_reported_without_blind_restore(self):
         self.ops.failure='damaged-recovery';self.assertEqual(self.call_apply(),20)
-        self.assertEqual(json.loads((self.run/'journal.json').read_text())['phase'],'recovery_required')
+        self.assertEqual(json.loads((self.run/'journal.json').read_text(encoding='utf-8'))['phase'],'recovery_required')
     def test_modified_source_is_rejected_before_tasks_or_backup(self):
         (self.release/'app/inventory/views.py').write_text('tampered')
         with self.assertRaises(RuntimeError):self.call_apply()
@@ -122,7 +122,7 @@ class StandardUpdateTests(unittest.TestCase):
     def test_custom_installed_code_is_not_overwritten(self):
         (self.app/'inventory/views.py').write_text('custom')
         with self.assertRaises(RuntimeError):self.call_apply()
-        self.assertEqual((self.app/'inventory/views.py').read_text(),'custom')
+        self.assertEqual((self.app/'inventory/views.py').read_text(encoding='utf-8'),'custom')
     def test_bad_paths_and_duplicate_names_are_rejected(self):
         for value in ('../outside','inventory/../outside','inventory//a.py','/absolute','C:/bad','inventory/a\\b'):
             with self.subTest(value=value),self.assertRaises(RuntimeError):u.code_path(value)
@@ -139,11 +139,11 @@ class StandardUpdateTests(unittest.TestCase):
         u.install_files(self.release,self.app,self.run,self.manifest,journal)
         (self.app/'inventory/views.py').write_text('custom after install')
         with self.assertRaises(RuntimeError):u.restore_files(self.app,self.run,self.manifest)
-        self.assertEqual((self.app/'inventory/views.py').read_text(),'custom after install')
+        self.assertEqual((self.app/'inventory/views.py').read_text(encoding='utf-8'),'custom after install')
     def test_recovery_from_written_journal(self):
         journal={'format':1,'rollback_ready':False,'protected':self.ops.protected,'tasks':self.ops.tasks,'phase':'files_installed'}
         u.install_files(self.release,self.app,self.run,self.manifest,journal)
-        loaded=json.loads((self.run/'journal.json').read_text())
+        loaded=json.loads((self.run/'journal.json').read_text(encoding='utf-8'))
         u.recover(self.ops,self.run,self.manifest,loaded)
         self.assert_original();self.assertEqual(loaded['phase'],'rolled_back')
     def test_single_process_lock_prevents_a_second_writer(self):
