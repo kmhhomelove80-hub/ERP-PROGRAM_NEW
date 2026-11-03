@@ -152,7 +152,7 @@ def install_files(release, app, run, manifest, journal):
         atomic_copy(Path(release)/'app'/entry['path'], target)
 
 
-def restore_files(app, run, manifest):
+def rollback_rows(app, run, manifest):
     data = json.loads((Path(run)/'rollback.json').read_text(encoding='utf-8'))
     if os.path.normcase(os.path.abspath(data['app_root'])) != os.path.normcase(os.path.abspath(app)):
         raise RuntimeError('복구 대상 설치 경로가 다릅니다.')
@@ -170,7 +170,17 @@ def restore_files(app, run, manifest):
         if row['existed']:
             source = Path(run)/'old-files'/name; no_links(source)
             if digest(source) != row['old']: raise RuntimeError('기존 코드 복구본이 손상되었습니다.')
-    for row in data['files']:
+    return data['files']
+
+
+def original_files_restored(app, run, manifest):
+    rows = rollback_rows(app, run, manifest)
+    return all((Path(app)/row['path']).is_file() and digest(Path(app)/row['path']) == row['old']
+               if row['existed'] else not (Path(app)/row['path']).exists() for row in rows)
+
+
+def restore_files(app, run, manifest):
+    for row in rollback_rows(app, run, manifest):
         target = Path(app)/row['path']
         if row['existed']: atomic_copy(Path(run)/'old-files'/row['path'], target)
         elif target.exists(): target.unlink()
@@ -195,6 +205,33 @@ def recover(ops, run, manifest, journal):
     journal['phase'] = 'rolled_back'
     atomic_json(Path(run)/'journal.json', journal)
 
+
+
+def reconcile(ops, run, manifest, journal):
+    """Finalize a verified, already restored v2 run without stopping ERP or writing DB."""
+    if journal['release'] != 'SUNIL-ERP-20261104-integrated-v2' or journal['phase'] != 'recovery_required' or not journal['rollback_ready']:
+        raise RuntimeError('이미 원복된 v2 미완료 기록만 확인할 수 있습니다.')
+    ops.check_protected(journal['protected'])
+    ops.select_web(journal['web'])
+    if not original_files_restored(ops.app, run, manifest):
+        raise RuntimeError('기존 코드 원복이 완전하지 않습니다. 서버를 변경하지 않고 중단합니다.')
+    recorded = {t['name']: t for t in journal['tasks']}
+    current = {t['name']: t for t in ops.tasks}
+    if set(recorded) != set(current):
+        raise RuntimeError('예약 작업 목록이 기존 기록과 다릅니다.')
+    for name, task in recorded.items():
+        if task['path'] != current[name]['path'] or task['actions'] != current[name]['actions']:
+            raise RuntimeError('예약 작업 정의가 기존 기록과 다릅니다.')
+        if name in ('SUNIL-ERP', 'SUNIL-Caddy') and not (current[name]['enabled'] and current[name]['running']):
+            raise RuntimeError('기존 ERP와 Caddy가 정상 실행 중일 때만 확인할 수 있습니다.')
+    if current['SUNIL-LocalBackup']['running']:
+        raise RuntimeError('정시 백업이 진행 중입니다. 완료 후 확인하세요.')
+    ops.health(old=True)
+    ops.check_protected(journal['protected'])
+    ops.restore_schedule(journal['tasks'])
+    journal['phase'] = 'rolled_back'
+    journal['reconciled_by'] = manifest['release']
+    atomic_json(Path(run)/'journal.json', journal)
 
 def apply(ops, release, run, manifest):
     validate_payload(release, ops.app, manifest)
@@ -396,7 +433,21 @@ class WindowsOps:
 
     def restore_schedule(self,tasks):
         selected=[t for t in tasks if t['name'] in ('SUNIL-ERP','SUNIL-LocalBackup')]
-        self.ps("$a=@($env:SUNIL_VALUES|ConvertFrom-Json); foreach($t in $a){if($t.enabled){Enable-ScheduledTask -TaskName $t.name -TaskPath $t.path -ErrorAction Stop|Out-Null}else{Disable-ScheduledTask -TaskName $t.name -TaskPath $t.path -ErrorAction Stop|Out-Null}}",values=selected)
+        if not selected:
+            return
+        if any(not isinstance(t.get('name'), str) or not isinstance(t.get('path'), str)
+               or type(t.get('enabled')) is not bool for t in selected):
+            raise RuntimeError('예약 작업 복구 값의 형식이 올바르지 않습니다.')
+        # PS 5.1 emits a JSON top-level array as ONE pipeline object. Wrapping
+        # ConvertFrom-Json in @() creates a nested array: $t.name becomes string[].
+        # A named envelope avoids pipeline enumeration differences in all hosts.
+        result = self.ps("$v=$env:SUNIL_VALUES|ConvertFrom-Json; $rows=@(foreach($t in $v.tasks){$name=[string]$t.name; $path=[string]$t.path; if($t.enabled){Enable-ScheduledTask -TaskName $name -TaskPath $path -ErrorAction Stop|Out-Null}else{Disable-ScheduledTask -TaskName $name -TaskPath $path -ErrorAction Stop|Out-Null}; $actual=Get-ScheduledTask -TaskName $name -TaskPath $path -ErrorAction Stop; [pscustomobject]@{name=[string]$actual.TaskName;path=[string]$actual.TaskPath;enabled=[bool]$actual.Settings.Enabled}}); $rows|ConvertTo-Json -Compress", values={'tasks': selected})
+        if isinstance(result, dict):
+            result = [result]
+        expected = {(t['name'], t['path']): t['enabled'] for t in selected}
+        if not isinstance(result, list) or len(result) != len(selected) or {
+                (t['name'], t['path']): t['enabled'] for t in result} != expected:
+            raise RuntimeError('예약 작업 활성 상태가 기존 기록과 다릅니다.')
 
     def start(self,tasks):
         erp=next(t for t in tasks if t['name']=='SUNIL-ERP')
@@ -460,7 +511,7 @@ class WindowsOps:
 
 def main(argv=None):
     parser=argparse.ArgumentParser(description='SUNIL ERP 통합 업데이트. 운영 설정과 DB를 덮어쓰지 않습니다.')
-    parser.add_argument('mode',choices=('check','apply','recover'))
+    parser.add_argument('mode',choices=('check','apply','recover','reconcile'))
     parser.add_argument('--config',default=r'C:\ProgramData\SUNIL\runtime.local.json')
     parser.add_argument('--work-paused',action='store_true')
     args=parser.parse_args(argv)
@@ -470,7 +521,7 @@ def main(argv=None):
         # Validate source before importing the installed app or reading the vault.
         config=json.loads(Path(args.config).read_text(encoding='utf-8-sig'))
         app=Path(config['AppRoot']).absolute()
-        validate_payload(release,app,manifest,installed=args.mode!='recover')
+        validate_payload(release,app,manifest,installed=args.mode not in ('recover','reconcile'))
         runs=Path(config['DataRoot'])/'standard-update-runs';no_links(runs)
         run=release/'logs'/uuid.uuid4().hex;run.mkdir(parents=True)
         with exclusive_lock(runs/'updater.lock'):
@@ -478,15 +529,21 @@ def main(argv=None):
             for p in runs.glob('*/journal.json'):
                 no_links(p)
                 if json.loads(p.read_text(encoding='utf-8'))['phase'] not in TERMINAL:pending.append(p.parent)
-            ops=WindowsOps(release,args.config,run,recovery=args.mode=='recover' or bool(pending))
-            if args.mode=='recover':
+            ops=WindowsOps(release,args.config,run,recovery=args.mode in ('recover','reconcile') or bool(pending))
+            if args.mode in ('recover','reconcile'):
                 if len(pending)!=1:raise RuntimeError('미완료 기록이 한 개일 때만 자동 코드 복구를 실행합니다. 로그를 전달해 주세요.')
                 run=pending[0];journal=json.loads((run/'journal.json').read_text(encoding='utf-8'))
-                if journal['owner_sid']!=ops.sid or journal['release']!=manifest['release'] or os.path.normcase(os.path.abspath(journal['app_root']))!=os.path.normcase(os.path.abspath(ops.app)):
+                if journal['owner_sid']!=ops.sid or journal['release']!=(('SUNIL-ERP-20261104-integrated-v2') if args.mode=='reconcile' else manifest['release']) or os.path.normcase(os.path.abspath(journal['app_root']))!=os.path.normcase(os.path.abspath(ops.app)):
                     raise RuntimeError('같은 계정·설치·버전의 복구 기록이 아닙니다.')
-                ops.run=run;recover(ops,run,manifest,journal)
-                print('기존 코드·예약 작업 복구 완료. DB는 덮어쓰지 않았습니다.');return 0
-            if pending:raise RuntimeError('미완료 기록이 있습니다. apply 대신 recover로 기존 코드를 먼저 복구하세요.')
+                ops.run=run
+                if args.mode=='reconcile':
+                    reconcile(ops,run,manifest,journal)
+                    print('기존 코드·웹·예약 작업 확인 및 미완료 기록 정리 완료. ERP 중지·파일 교체·DB 변경은 하지 않았습니다.')
+                else:
+                    recover(ops,run,manifest,journal)
+                    print('기존 코드·예약 작업 복구 완료. DB는 덮어쓰지 않았습니다.')
+                return 0
+            if pending:raise RuntimeError('미완료 기록이 있습니다. 이미 원복된 v2는 reconcile로 확인하세요. apply는 실행하지 마세요.')
             if all((app/e['path']).is_file() and digest(app/e['path'])==e['sha256'] for e in manifest['files']):
                 print('이미 같은 통합 배포본이 적용되어 있습니다. 다시 설치하거나 서버를 중지하지 않습니다.');return 0
             if args.mode=='check':

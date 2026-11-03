@@ -18,12 +18,17 @@ class FakeOps:
     def __init__(self,root,app,failure=''):
         self.root=Path(root);self.app=Path(app);self.failure=failure;self.sid='synthetic-owner'
         self.tasks=[{'name':'SUNIL-ERP','enabled':True,'running':True},{'name':'SUNIL-LocalBackup','enabled':True,'running':False}]
+        self.tasks.append({'name':'SUNIL-Caddy','enabled':True,'running':True})
+        for task in self.tasks:task.update(path='\\',actions=[{'Execute':'synthetic','Arguments':task['name'],'WorkingDirectory':'synthetic'}])
+        self.web='http://127.0.0.1:8080'
         self.protected={str(self.root/'runtime.local.json'):u.digest(self.root/'runtime.local.json')}
         self.events=[];self.running=True;self.schedule=True
         self.db={'stock':{'count':1,'sha256':'unchanged'},'accounts':{'count':1,'sha256':'unchanged'}}
     def check_protected(self,protected):
         for path,sha in protected.items():
             if u.digest(path)!=sha:raise RuntimeError('changed protected file')
+    def select_web(self,value):
+        if value!=self.web:raise RuntimeError('web changed')
     def maintenance(self,tasks):self.events.append('maintenance');self.schedule=False
     def stop(self):self.events.append('stop');self.running=False
     def start(self,tasks):self.events.append('start');self.running=True
@@ -141,11 +146,48 @@ class StandardUpdateTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):u.restore_files(self.app,self.run,self.manifest)
         self.assertEqual((self.app/'inventory/views.py').read_text(encoding='utf-8'),'custom after install')
     def test_recovery_from_written_journal(self):
-        journal={'format':1,'rollback_ready':False,'protected':self.ops.protected,'tasks':self.ops.tasks,'phase':'files_installed'}
+        journal={'format':1,'rollback_ready':False,'protected':self.ops.protected,'tasks':self.ops.tasks,'phase':'files_installed','web':self.ops.web}
         u.install_files(self.release,self.app,self.run,self.manifest,journal)
         loaded=json.loads((self.run/'journal.json').read_text(encoding='utf-8'))
         u.recover(self.ops,self.run,self.manifest,loaded)
         self.assert_original();self.assertEqual(loaded['phase'],'rolled_back')
+    def restored_v2_journal(self):
+        journal={'release':'SUNIL-ERP-20261104-integrated-v2','rollback_ready':False,
+                 'protected':self.ops.protected,'tasks':json.loads(json.dumps(self.ops.tasks)),
+                 'phase':'recovery_required','web':self.ops.web,'error':'original v2 schedule failure'}
+        u.install_files(self.release,self.app,self.run,self.manifest,journal)
+        u.restore_files(self.app,self.run,self.manifest)
+        return journal
+    def test_reconcile_verified_v2_does_not_stop_copy_migrate_or_backup(self):
+        journal=self.restored_v2_journal()
+        u.reconcile(self.ops,self.run,self.manifest,journal)
+        self.assertEqual(self.ops.events,['health-old','restore-schedule'])
+        self.assert_original();self.assertEqual(journal['phase'],'rolled_back')
+        self.assertEqual(journal['error'],'original v2 schedule failure')
+        self.assertEqual(journal['reconciled_by'],self.manifest['release'])
+    def test_reconcile_rejects_incomplete_restore_before_any_side_effects(self):
+        journal=self.restored_v2_journal()
+        u.atomic_copy(self.release/'app/inventory/views.py',self.app/'inventory/views.py')
+        with self.assertRaises(RuntimeError):u.reconcile(self.ops,self.run,self.manifest,journal)
+        self.assertEqual(self.ops.events,[]);self.assertEqual(journal['phase'],'recovery_required')
+    def test_reconcile_rejects_changed_task_definition_or_stopped_server(self):
+        journal=self.restored_v2_journal()
+        self.ops.tasks[0]['actions'][0]['Arguments']='changed'
+        with self.assertRaises(RuntimeError):u.reconcile(self.ops,self.run,self.manifest,journal)
+        self.assertEqual(self.ops.events,[])
+        self.ops.tasks=json.loads(json.dumps(journal['tasks']));self.ops.tasks[0]['running']=False
+        with self.assertRaises(RuntimeError):u.reconcile(self.ops,self.run,self.manifest,journal)
+        self.assertEqual(self.ops.events,[])
+    def test_reconcile_rejects_damaged_backup_and_preserves_current_code(self):
+        journal=self.restored_v2_journal()
+        (self.run/'old-files/config/urls.py').write_text('damaged backup')
+        with self.assertRaises(RuntimeError):u.reconcile(self.ops,self.run,self.manifest,journal)
+        self.assertEqual(self.ops.events,[]);self.assert_original()
+    def test_reconcile_schedule_failure_does_not_mark_complete_or_change_code(self):
+        journal=self.restored_v2_journal()
+        with patch.object(self.ops,'restore_schedule',side_effect=RuntimeError('injected task error')):
+            with self.assertRaises(RuntimeError):u.reconcile(self.ops,self.run,self.manifest,journal)
+        self.assertEqual(journal['phase'],'recovery_required');self.assert_original()
     def test_single_process_lock_prevents_a_second_writer(self):
         with u.exclusive_lock(self.root/'updater.lock'):
             with self.assertRaises(RuntimeError):
