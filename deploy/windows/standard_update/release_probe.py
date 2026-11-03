@@ -43,7 +43,8 @@ elif mode == 'health':
     if '--old' not in sys.argv:
         paths.append('/production/')
     for path in paths:
-        request = RequestFactory().get(path)
+        host = sys.argv[sys.argv.index('--host')+1] if '--host' in sys.argv else '127.0.0.1'
+        request = RequestFactory().get(path, HTTP_HOST=host)
         request.user = user
         request.session = {}
         request._messages = FallbackStorage(request)

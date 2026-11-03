@@ -185,6 +185,7 @@ def preserve_fingerprint(before, after):
 
 def recover(ops, run, manifest, journal):
     ops.check_protected(journal['protected'])
+    if hasattr(ops, 'select_web'): ops.select_web(journal.get('web'))
     if journal['rollback_ready']:
         ops.maintenance(journal['tasks']); ops.stop()
         restore_files(ops.app, run, manifest)
@@ -199,7 +200,7 @@ def apply(ops, release, run, manifest):
     validate_payload(release, ops.app, manifest)
     journal = {'format': 1, 'release': manifest['release'], 'owner_sid': ops.sid, 'app_root': str(ops.app),
                'phase': 'prepared', 'rollback_ready': False, 'controlled': False,
-               'tasks': ops.tasks, 'protected': ops.protected, 'backups': [], 'error': ''}
+               'tasks': ops.tasks, 'protected': ops.protected, 'backups': [], 'error': '', 'web': getattr(ops, 'web', '')}
     atomic_json(Path(run)/'journal.json', journal)
     try:
         ops.check_protected(journal['protected'])
@@ -294,7 +295,11 @@ class WindowsOps:
         self.captured=self.process()
         if self.captured: self.check_process(self.captured)
         if not recovery and self.captured is None: raise RuntimeError('기존 ERP 8000 포트가 열려 있지 않습니다.')
-        self.web='http://127.0.0.1:8080'
+        addresses=self.ps("@(Get-NetTCPConnection -State Listen -ErrorAction Stop|Where-Object LocalPort -eq 8080|Select-Object -ExpandProperty LocalAddress -Unique)|ConvertTo-Json -Compress") or []
+        if isinstance(addresses,str): addresses=[addresses]
+        self.web_candidates=['http://'+a+':8080' for a in addresses if ':' not in a and a not in ('0.0.0.0',)]
+        self.web_candidates=list(dict.fromkeys([*self.web_candidates,'http://127.0.0.1:8080']))
+        self.web=self.web_candidates[0]
         if not recovery:
             profile=self.probe('profile')
             if (profile['vendor'],profile['name'],profile['user']) != ('postgresql','sunil','sunil'): raise RuntimeError('기존 PostgreSQL sunil DB/사용자가 아닙니다.')
@@ -303,7 +308,15 @@ class WindowsOps:
             if shutil.disk_usage(self.config['BackupDirectory']).free < need: raise RuntimeError('DB 백업을 위한 여유 공간이 부족합니다.')
             self.command([sys.executable,'manage.py','check'],'old-check')
             self.command([sys.executable,'manage.py','migrate','--check'],'old-migration-check')
-            self.http('/login/')
+            for candidate in self.web_candidates:
+                self.web=candidate
+                try: self.http('/login/');break
+                except Exception: continue
+            else: raise RuntimeError('기존 Caddy 로그인 화면에 접속할 수 없습니다.')
+
+    def select_web(self,value):
+        if value not in self.web_candidates: raise RuntimeError('복구 기록의 웹 주소가 현재 Caddy 주소와 다릅니다.')
+        self.web=value
 
     def command(self, args, label, timeout=180, env=None, secret=False):
         failure = None
@@ -339,7 +352,10 @@ class WindowsOps:
     def ps(self, code, *, values=None, secret=False):
         env={key:value for key,value in self.env.items() if key not in ('ERP_SECRET_KEY','ERP_DB_PASSWORD')}
         env.update(SUNIL_CONFIG_PATH=str(self.config_path),SUNIL_VALUES=json.dumps(values or {}))
-        preamble="$ErrorActionPreference='Stop'; [Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); "
+        # Windows PowerShell 5.1 must not autoload PowerShell 7 modules inherited
+        # from the caller (including GitHub Actions' pwsh host). Process only.
+        env['PSModulePath'] = str(Path(self.powershell).parent/'Modules')
+        preamble="$ErrorActionPreference='Stop'; [Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); Import-Module Microsoft.PowerShell.Security -ErrorAction Stop; "
         output=self.command([self.powershell,'-NoProfile','-NonInteractive','-Command',preamble+code], 'windows-command', env=env, secret=secret)
         return json.loads(output) if output.strip() else None
 
@@ -371,7 +387,9 @@ class WindowsOps:
         for _ in range(5):
             if self.process() is None: return
             time.sleep(1)
-        current=self.process();self.check_process(current,captured=True)
+        current=self.process()
+        if current is None: return
+        self.check_process(current,captured=True)
         self.ps("$v=$env:SUNIL_VALUES|ConvertFrom-Json; $p=Get-CimInstance Win32_Process -Filter ('ProcessId='+$v.pid); if($p -and ('ticks:'+$p.CreationDate.ToUniversalTime().Ticks.ToString()) -eq $v.created){Stop-Process -Id $v.pid -ErrorAction Stop}else{throw 'Process changed'}",values={'pid':current['ProcessId'],'created':str(current['CreationDate'])})
         time.sleep(1)
         if self.process() is not None: raise RuntimeError('ERP가 중지되지 않았습니다.')
@@ -434,7 +452,7 @@ class WindowsOps:
                 if not old:
                     self.http('/static/inventory/production_plan.js','production-data')
                     self.http('/static/inventory/movement_notifications.js','movement-pending-notice')
-                self.probe('health',*(['--old'] if old else []));return
+                self.probe('health',*(['--old'] if old else []),'--host',self.web.removeprefix('http://'));return
             except Exception:
                 if attempt==9:raise
                 time.sleep(1)

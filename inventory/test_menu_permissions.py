@@ -39,6 +39,12 @@ class MenuPermissionTests(TestCase):
             self.assertEqual((self.stock.quantity, self.stock.reserved, self.move.state), (10, 0, 'pending'))
         self.assertFalse(AuditEvent.objects.exists())
 
+    def test_read_only_receipt_list_hides_write_shortcuts(self):
+        self.grant()
+        response = self.client.get('/receipts/')
+        self.assertNotContains(response, 'href="/receipts/new/"')
+        self.assertNotContains(response, 'href="/receipts/bulk/"')
+
     def test_staff_flag_does_not_override_explicit_menu_restrictions(self):
         self.grant('management')
         self.assertTrue(self.user.is_staff)
@@ -56,6 +62,7 @@ class MenuPermissionTests(TestCase):
         with self.assertRaises(ValidationError): reserve(stock_id=self.stock.pk, project='forbidden', quantity=1, actor=self.user)
         with self.assertRaises(ValidationError): process_movement(request_id=self.move.pk, actor=self.user)
         self.assertEqual(self.client.get('/admin/auth/user/').status_code, 302)
+        self.assertNotContains(self.client.get('/picking/'), 'href="/picking/new/"')
         self.assertEqual(self.client.post('/production/settings/', {}).status_code, 403)
 
     def test_shipping_only_employee_can_reserve_but_cannot_receive(self):
