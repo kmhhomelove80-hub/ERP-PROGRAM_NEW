@@ -17,6 +17,8 @@ jobs:
       - run: python manage.py makemigrations --check --dry-run
       - run: python manage.py test --noinput
       - run: python scripts/check_laptop_upgrade.py
+      - run: python scripts/test_standard_update.py
+      - run: python scripts/test_standard_update_windows.py
   postgresql18:
     runs-on: ubuntu-latest
     services:
