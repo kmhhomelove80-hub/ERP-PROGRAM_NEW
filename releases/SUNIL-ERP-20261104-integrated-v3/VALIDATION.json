@@ -1,0 +1,39 @@
+{
+  "success": true,
+  "windows_native_success": true,
+  "windows_schedule_restore_success": true,
+  "commit": "5625565aeb506d06f56180046f8751da88be478e",
+  "run_url": "https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/actions/runs/41738335343",
+  "erp_run_url": "https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/actions/runs/41738335467",
+  "windows_runner": "Windows Server 2025 / Python 3.12 / native Windows PowerShell 5.1",
+  "tests": {
+    "app_total": 257,
+    "windows_skipped": 12,
+    "postgresql18_skipped": 5,
+    "update_engine": 23,
+    "windows_native": 3
+  },
+  "jobs": [
+    {
+      "name": "browser",
+      "conclusion": "success",
+      "url": "https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/actions/runs/41738335343/job/126273205318"
+    },
+    {
+      "name": "windows-python312",
+      "conclusion": "success",
+      "url": "https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/actions/runs/41738335343/job/126273205764"
+    },
+    {
+      "name": "postgresql18",
+      "conclusion": "success",
+      "url": "https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/actions/runs/41738335343/job/126273205832"
+    }
+  ],
+  "native_schedule_regression": "PASS: real unique-folder tasks, original multi-task failure reproduced, fixed 1/2 tasks and mixed enable states, successful apply, injected failure rollback, v2 reconcile; no real SUNIL root tasks touched",
+  "postgresql18_release_roundtrip": "PASS isolated PG18: full update preserves original data/accounts/grants, binary workbook backup/new-DB restore matches, injected failure restores old code, retry from old code + already-applied 0012/0013 succeeds",
+  "artifact_overlay_regression": "PASS: d425d71 + actual published Nov3 ZIP passes final v3 preflight; manuscript preserved through apply/rollback; runtime edits rejected",
+  "verified_application_and_helper_files": 178,
+  "browser": "Production and menu permission browser checks passed",
+  "note": "No production server or DB accessed by developer. Actual local preflight remains required. No antivirus-clean claim."
+}

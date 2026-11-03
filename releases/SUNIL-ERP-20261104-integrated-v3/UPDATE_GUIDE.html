@@ -1,0 +1,68 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SUNIL ERP 통합 업데이트 안내</title><style>body{font:17px/1.75 "Malgun Gothic",sans-serif;max-width:900px;margin:30px auto;padding:0 18px;color:#152b46}pre{background:#edf2f8;padding:14px;white-space:pre-wrap;overflow-wrap:anywhere}h2{margin-top:35px}li{margin:10px 0}code{overflow-wrap:anywhere}@media print{body{font-size:12px}}</style><h1>SUNIL ERP 통합 업데이트 — 2026년 11월 4일용</h1>
+<p>생산계획조회, 대메뉴별 직원 권한, 이동 대기 알림, 오른쪽 업무 조회 영역, 기존 메뉴·검색·피킹 개선을 포함합니다. <strong>회사 ERP 서버에서 기존 Windows 계정으로 실행하는 업데이트</strong>이며 새 설치·DB 재이관용이 아닙니다.</p>
+<p>이 배포본에는 EXE가 없습니다. 기존 Python으로 공개된 업데이트 코드를 실행합니다. 백신 허용·제외 설정, 실행 정책 변경, 자동 관리자 권한 전환을 하지 않습니다. Windows 보안이 이 파일도 차단하면 진행하지 말고 화면을 전달해 주세요. 이전에 보류한 EXE는 사용하지 않습니다.</p>
+<p>이번 v3는 Windows PowerShell 5.1에서 예약 작업 여러 개를 복구할 때 작업 이름이 배열로 전달되던 오류를 수정합니다. 실제 예약 작업의 복구 결과도 다시 조회해 확인합니다. 이전 배포에서 갱신되지 않았던 매뉴얼 원고 MD는 보존하며, 생산계획·권한 등 프로그램 기능은 기존 통합본과 같습니다. v2는 다시 실행하지 마세요.</p>
+<h2>1. 준비</h2>
+<ol>
+<li>회사 ERP 서버에 평소 사용하던 <strong>기존 Windows 계정(비밀키를 만든 계정)</strong>으로 로그인합니다. 기존 ERP 접속이 정상인지 확인합니다.</li>
+<li>새 ZIP을 다운로드합니다. 파일 이름은 <code>SUNIL-ERP-20261104-integrated-v3.zip</code>입니다.</li>
+<li>압축을 풀어 다음 위치에 둡니다. 폴더 안에 <code>Update-Erp.py</code>, <code>manifest.json</code>, <code>app</code> 폴더가 바로 보여야 합니다.</li>
+</ol>
+<p><code>C:\SUNIL\updates\SUNIL-ERP-20261104-integrated-v3</code></p>
+<p>압축 해제 결과 같은 이름의 폴더가 두 번 겹쳐 있으면 실제 파일이 들어 있는 안쪽 폴더를 위 위치로 옮깁니다. <code>app</code> 폴더를 기존 ERP에 직접 덮어쓰지 마세요.
+4. 다운로드한 ZIP과 압축 해제 폴더를 사용 중인 백신으로 검사합니다. 차단·경고가 나오면 허용하지 말고 중단합니다.
+5. 시작 메뉴에서 <strong>Windows PowerShell</strong>을 검색하고 <strong>관리자 권한으로 실행</strong>합니다. 같은 Windows 계정으로 승인합니다. 다른 관리자 계정의 암호를 요구하면 취소하고 알려 주세요.</p>
+<p>아래 명령은 하나씩 실행합니다. 앞선 대화에서 사용한 <code>$Config</code> 같은 변수나 PowerShell 스크립트 로딩은 필요하지 않습니다.</p>
+<h2>v2 실패 후 기존 ERP로 복구된 서버 — 먼저 한 번만 확인</h2>
+<p>v2에서 마지막 예약 작업 복구가 실패했고, 기존 ERP 파일이 모두 원복되어 정상 접속 중인 경우에만 해당합니다. 기존 기록 폴더와 백업을 지우지 마세요. 같은 계정의 관리자 PowerShell에서 아래 명령부터 실행합니다.</p>
+<pre><code class="language-powershell">&amp; 'C:\SUNIL\ERP\.venv\Scripts\python.exe' 'C:\SUNIL\updates\SUNIL-ERP-20261104-integrated-v3\Update-Erp.py' reconcile
+</code></pre>
+<p>도구는 원래 코드·복구본의 체크섬, 기존 계정·설정·예약 작업 정의, 현재 ERP·Caddy 실행과 웹 접속을 검사합니다. 확인 후 원래 예약 작업 활성 상태를 복구하고 미완료 기록을 <code>rolled_back</code>으로 정리합니다. <strong>ERP 중지·코드 교체·DB 변경·백업 복원은 하지 않습니다.</strong> 실제 파일이 원복되지 않았거나 조건이 다르면 완료 처리하지 않고 중단합니다.</p>
+<p><strong>‘기존 코드·웹·예약 작업 확인 및 미완료 기록 정리 완료’</strong>가 나오면 아래 check부터 진행합니다. 오류가 나면 apply·recover를 실행하거나 기록을 직접 수정하지 말고 화면을 전달하세요. v2를 실행한 적 없는 서버는 이 절차를 건너뜁니다.</p>
+<h2>2. 사전 점검 — 먼저 이 명령만 실행</h2>
+<pre><code class="language-powershell">&amp; 'C:\SUNIL\ERP\.venv\Scripts\python.exe' 'C:\SUNIL\updates\SUNIL-ERP-20261104-integrated-v3\Update-Erp.py' check
+</code></pre>
+<p><strong>‘사전 점검 완료’</strong>가 나와야 다음 단계로 갑니다. 이 단계는 서버를 중지하거나 프로그램을 교체하거나 DB 구조를 변경하지 않습니다. 점검 로그와 중복 실행 방지 파일은 만듭니다.</p>
+<p>오류·차단·예상과 다른 경로가 나오면 <strong>다음 명령을 실행하지 말고</strong> 화면을 전달해 주세요. ‘이미 같은 통합 배포본이 적용되어 있습니다’가 나오면 다시 업데이트할 필요가 없습니다.</p>
+<h2>3. 업데이트 실행</h2>
+<p>직원들에게 잠시 <strong>입고·출고·예약·이동 처리·생산계획 업로드·권한 변경을 멈춰 달라</strong>고 알립니다. 다른 프로그램에서 같은 DB에 쓰는 작업도 중단합니다. 그다음 아래 한 명령을 실행합니다.</p>
+<pre><code class="language-powershell">&amp; 'C:\SUNIL\ERP\.venv\Scripts\python.exe' 'C:\SUNIL\updates\SUNIL-ERP-20261104-integrated-v3\Update-Erp.py' apply --work-paused
+</code></pre>
+<p>도구는 아래 순서를 자동 처리합니다.</p>
+<ol>
+<li>기존 예약 작업 상태를 기록하고 정시 백업과 충돌하지 않도록 준비합니다.</li>
+<li><strong>DB 백업과 SHA256 검증 후</strong> ERP를 중지합니다. PostgreSQL과 Caddy는 유지합니다.</li>
+<li>중지 시점의 최신 DB 백업·비교값과 기존 코드 복구본을 만듭니다.</li>
+<li>배포 파일 체크섬을 확인하고 프로그램 파일을 교체합니다. 서버의 별도 수정 파일은 자동으로 덮어쓰지 않습니다.</li>
+<li>예정된 <strong>0012 생산계획 / 0013 대메뉴 권한</strong> 외의 변경이 없는지 검사한 뒤 필요한 마이그레이션만 적용합니다. 이미 적용된 것은 다시 만들지 않습니다.</li>
+<li>정적 파일 수집, 기존 업무 데이터·계정·설정 보존 검사, ERP 재시작, 로그인 화면·정적 파일·로그인 후 읽기 화면 검사를 진행합니다.</li>
+<li>업데이트 후 DB 백업을 검증하고 기존 정시 백업 설정을 복구합니다.</li>
+</ol>
+<p>완료될 때까지 PowerShell 창을 닫거나 컴퓨터를 끄지 마세요. 백업 용량에 따라 시간이 걸리며 진행 메시지와 로그를 남깁니다. <strong>‘업데이트와 백업 검증 완료’</strong>를 확인합니다.</p>
+<h2>4. 화면 확인 후 업무 재개</h2>
+<ol>
+<li>기존 ERP 주소에 접속하고 PC에서 <strong>Ctrl+F5</strong>로 새로고침합니다. 휴대폰도 새로고침합니다.</li>
+<li>상단 오른쪽 별도 영역의 <strong>생산계획조회</strong>를 확인합니다.</li>
+<li>생산계획조회가 모두 가능한 계정에서 <strong>엑셀 열기 · 열 연결 설정</strong>으로 파일을 읽고, 시트·헤더 행·데이터 시작 행·13개 열 연결을 확인한 뒤 공유 자료로 적용합니다. 동명 헤더는 직접 열을 선택합니다.</li>
+<li>조회 계정에서는 검색·정렬·선택 행의 부품 표시가 되고 업로드 버튼은 없는지 확인합니다.</li>
+<li><strong>관리 → 직원 계정 → 직원 선택</strong>에서 입고 관리·출고 관리·생산계획조회·재고 관리·관리의 다섯 선택란을 확인합니다. 기존 전체 권한 직원은 모두 가능, 기존 작업자는 조회만 가능으로 보존됩니다. 필요한 직원에게만 대메뉴별로 권한을 부여합니다. 새 직원의 기본값은 모두 조회만 가능입니다.</li>
+<li>현장 직원의 이동 요청이 대기 중이면 <strong>재고 관리가 모두 가능한 직원</strong>에게 상단 알림과 건수가 표시됩니다. 클릭하면 대기 목록이 열리며 처리 완료·거부 후 건수에서 제외됩니다. 화면이 보이는 동안 60초마다, 다시 화면으로 돌아왔을 때 갱신합니다.</li>
+<li>재고 조회의 제품명·사양 동시 검색과 메뉴 겹침 방지, <strong>운영 점검의 원장·예약 합계 일치</strong>를 확인합니다. 확인을 위해 실제 출고나 재고 이동을 임의로 실행하지 않습니다.</li>
+<li>완료 메시지의 백업 위치를 기록합니다. 다음 정시 로컬 백업 성공도 확인합니다. 확인 후 직원들에게 업무 재개를 알립니다.</li>
+</ol>
+<h2>중단·실패·정전이 발생하면</h2>
+<ul>
+<li><strong>‘기존 코드와 예약 작업으로 복구했습니다’</strong>: 기존 ERP 접속을 확인하고 오류 화면과 로그를 전달해 주세요. 기존 코드로 돌렸더라도 추가된 DB 테이블은 보존합니다. DB를 과거 백업으로 덮어쓰지 않습니다.</li>
+<li><strong>‘자동 복구를 마치지 못했습니다’</strong>: 반복해서 apply를 실행하거나 DB를 복원하지 마세요. 업무 처리를 멈춘 상태에서 로그를 전달해 주세요.</li>
+<li>창이 강제로 닫혔거나 미완료 기록이 있으면 같은 계정·같은 배포 폴더에서 다음 명령으로 <strong>코드·예약 작업만 복구</strong>합니다.</li>
+</ul>
+<pre><code class="language-powershell">&amp; 'C:\SUNIL\ERP\.venv\Scripts\python.exe' 'C:\SUNIL\updates\SUNIL-ERP-20261104-integrated-v3\Update-Erp.py' recover
+</code></pre>
+<ul>
+<li>복구 후 다시 check부터 시작합니다. 복구 오류가 나면 더 진행하지 않습니다.</li>
+<li><strong>마지막 백업 경고</strong>만 나오면 업데이트와 웹 검사는 완료된 상태입니다. 중지 시점의 검증된 백업은 남아 있습니다. 업데이트를 반복하지 말고 로그를 전달해 주세요.</li>
+</ul>
+<h2>보존 및 기록</h2>
+<p>기존 DB·계정·비밀번호·로컬 설정·DPAPI 비밀키·실제 Caddy 설정·현재 내부 HTTP 및 DEBUG=1을 보존합니다. 기존 <code>Run-Erp.ps1</code>·<code>Common.ps1</code>과 Caddy/예약 작업 정의를 덮어쓰지 않으며 공유기·외부 접속 설정을 변경하지 않습니다. DB 초기화·재이관·자동 DB 복원은 없습니다. 추가 마이그레이션은 생산계획·직원별 메뉴 권한용 새 테이블만 만듭니다.</p>
+<p>백업은 기존 설정의 로컬 백업 폴더를 사용합니다. 실제 경로는 실행 중 출력합니다. 적용 기록·기존 코드 복구본·검사 stdout/stderr는 기존 DataRoot 아래 <code>standard-update-runs</code>에, 사전 점검 로그는 배포 폴더의 <code>logs</code>에 남깁니다. 비밀키·DB 암호를 로그나 명령행에 출력하지 않습니다. DB 백업이나 비밀키 파일은 외부에 공유하지 마세요.</p>
+<p><code>VALIDATION.json</code>에는 공개 검증 실행과 검증 코드 기준을, <code>manifest.json</code>에는 배포 파일 체크섬을 기록합니다. 배포 ZIP의 SHA256도 다운로드 페이지에서 제공합니다. 체크섬은 손상 확인용이며 백신의 안전 판정을 대신하지 않습니다.</p></html>
