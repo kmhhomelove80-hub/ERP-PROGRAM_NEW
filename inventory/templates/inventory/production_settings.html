@@ -1,0 +1,36 @@
+{% extends 'inventory/base.html' %}
+{% block title %}생산계획 열 연결 설정{% endblock %}
+{% block content %}
+<h1>생산계획 · 엑셀 및 열 연결 설정</h1>
+<p><a href="{% url 'production-plan' %}">← 생산계획 조회</a></p>
+{% if error %}<p class="errorlist" role="alert">{{ error|linebreaksbr }}</p>{% endif %}
+<form method="post" enctype="multipart/form-data" class="card">{% csrf_token %}
+<input type="hidden" name="action" value="upload">
+<label for="production-file">엑셀 파일 선택 · 최대 10MB</label>
+<input id="production-file" name="workbook" type="file" accept=".xlsx,.xlsm" required><button>파일 읽기</button>
+<p><small>열 이름으로 자동 연결하며, 열이 없거나 중복되면 직접 지정해야 합니다. 적용 전에는 기존 공유 자료가 유지됩니다.</small></p>
+</form>
+{% if sheets %}
+<form method="post" class="card">{% csrf_token %}
+<input type="hidden" name="configuration_token" value="{{ configuration_token }}">
+<input type="hidden" name="revision" value="{{ draft.revision }}">
+<h2>{{ draft.filename }}</h2>
+<div class="filters">
+<div><label for="sheet">시트</label><select id="sheet" name="sheet">{% for s in sheets %}<option {% if s == config.sheet %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+<div><label for="first">헤더 시작 행</label><input id="first" type="number" name="first" min="1" max="20000" value="{{ config.first|default:2 }}" required style="width:115px"></div>
+<div><label for="last">헤더 끝 행</label><input id="last" type="number" name="last" min="1" max="20000" value="{{ config.last|default:3 }}" required style="width:115px"></div>
+<div><label for="start">데이터 시작 행</label><input id="start" type="number" name="start" min="2" max="20000" value="{{ config.start|default:4 }}" required style="width:115px"></div>
+</div>
+<p><button name="action" value="inspect">시트·헤더 변경 후 열 목록 확인</button></p>
+<p><small>아래 13개 항목을 확인해 주세요. 저장한 연결은 다음 파일의 헤더 이름으로 다시 찾습니다. 열 번호는 고정해서 재사용하지 않습니다.</small></p>
+{% if fields %}
+<div class="table"><table><thead><tr><th>조회 항목</th><th>엑셀 열 · 헤더 이름</th></tr></thead><tbody>
+{% for field in fields %}<tr><th><label for="col-{{ field.key }}" style="margin:0">{{ field.label }}</label>{% if field.unresolved %}<small class="errorlist"> · 직접 지정 필요</small>{% endif %}</th><td><select id="col-{{ field.key }}" name="col_{{ field.key }}" style="max-width:100%;width:520px"><option value="">열을 선택해 주세요</option>{% for option in choices %}<option value="{{ option.column }}" {% if option.column == field.selected %}selected{% endif %}>{{ option.label }}</option>{% endfor %}</select></td></tr>{% endfor %}
+</tbody></table></div>
+<p><button name="action" value="apply">설정 저장 및 공유 자료 적용</button></p>
+{% endif %}
+<details><summary>엑셀 열별 샘플 보기</summary><div class="table"><table><thead><tr><th>열 · 헤더</th><th>처음 2개 행의 값</th></tr></thead><tbody>{% for option in choices %}<tr><td>{{ option.label }}</td><td>{{ option.preview }}</td></tr>{% endfor %}</tbody></table></div></details>
+<p><small>생산일정의 세로 병합값은 연결된 열을 기준으로 각 행에 채웁니다. 수식은 엑셀에서 저장된 계산값을 읽습니다. 최신 적용 자료는 로그인한 조회 계정과 공유됩니다.</small></p>
+</form>
+{% endif %}
+{% endblock %}

@@ -4,6 +4,7 @@
 
 현재 핵심 기능 구현/개발 검증을 완료했으며 운영 서버에는 배포하지 않았다. 회사 서버·호스트명·후임자·최종 자료를 확인한 뒤 전환한다.
 
+- [생산계획 웹 조회·엑셀 열 연결 설정](docs/PRODUCTION_PLAN.md)
 - [Windows 노트북·같은 Wi-Fi 휴대폰 테스트](docs/LAPTOP_TEST.md)
 - [개발계획](docs/DEVELOPMENT_PLAN.md)
 - [배치별 진도](docs/PROGRESS.md)
@@ -41,6 +42,8 @@ PostgreSQL에는 ERP_DB_NAME, ERP_DB_USER, ERP_DB_PASSWORD 및 선택적으로 E
 | /allocations/ | 일반 배정 프로젝트·SEQ 필터/Shift 선택/필터 전체 Release·취소 |
 | /substitutions/ | 대체 출고(빌림)·생산 입고분 상환·회사 ERP 정산 확인 |
 | /movements/ | 본인 이동 요청/관리자 처리 |
+| /production/ | 생산계획 조회·검색·선택 행 부품 정보 |
+| /production/settings/ | 생산계획 업로드·시트/헤더/열 연결 설정(관리자) |
 | /erp/ | ERP 자료 업로드·대조·원인/조치 |
 | /history/ | 새 시스템 작업 이력 |
 | /archives/ | 기존 Excel 과거 이력 보관 |

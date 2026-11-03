@@ -199,3 +199,22 @@ class SubstitutionSettlement(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     class Meta:
         constraints = [models.CheckConstraint(condition=Q(quantity__gt=0),name='positive_substitution_settlement')]
+
+
+class ProductionPlanDraft(models.Model):
+    """Private workbook and saved mapping preferences for one staff user."""
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    workbook = models.BinaryField(default=bytes)
+    filename = models.CharField(max_length=255, blank=True)
+    config = models.JSONField(default=dict)
+    revision = models.UUIDField(default=uuid.uuid4)
+
+
+class ProductionPlanSnapshot(models.Model):
+    """The shared, confirmed production plan; never updates inventory."""
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    rows = models.JSONField(default=list)
+    filename = models.CharField(max_length=255)
+    config = models.JSONField(default=dict)
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    updated_at = models.DateTimeField(auto_now=True)

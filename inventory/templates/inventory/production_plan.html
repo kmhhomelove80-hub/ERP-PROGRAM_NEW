@@ -1,0 +1,26 @@
+{% extends 'inventory/base.html' %}{% load static %}
+{% block title %}생산계획 조회{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'inventory/production_plan.css' %}">
+<div id="production-app">
+<div class="production-top"><h1>선박등기구 생산계획</h1>{% if user.is_staff %}<a class="button" href="{% url 'production-settings' %}" id="production-open">엑셀 열기 · 열 연결 설정</a>{% endif %}</div>
+{% if snapshot %}
+<div class="production-filters no-print">
+<label>검색 항목<select id="plan-scope"><option value="">전체 항목</option>{% for h in headers %}{% if not forloop.first %}<option value="{{ forloop.counter0|add:'-1' }}">{{ h }}</option>{% endif %}{% endfor %}</select></label>
+<label class="production-query">검색어 · 여러 단어는 모두 포함 <small>검색 Ctrl+F{% if user.is_staff %} · 파일 열기 Ctrl+O{% endif %}</small><input id="plan-query" type="search" autocomplete="off"></label>
+<label>생산일정<select id="plan-schedule"><option value="">전체 일정</option></select></label>
+<button id="plan-reset" type="button">초기화</button><button id="plan-export" type="button">검색 결과 저장</button>
+</div>
+<div class="production-meta"><span id="plan-count" role="status" aria-live="polite"></span><small>{{ snapshot.filename }} · {{ snapshot.updated_at|date:'m/d H:i' }}</small></div>
+<div class="production-scroll" id="plan-scroll"><table id="plan-table"><colgroup></colgroup><thead><tr>{% for h in headers %}<th><button type="button" data-sort="{{ forloop.counter0 }}">{% if forloop.counter0 == 4 %}완료{% elif forloop.counter0 == 5 %}잔량{% else %}{{ h }}{% endif %}</button></th>{% endfor %}</tr></thead><tbody></tbody></table></div>
+<div class="production-pages no-print"><button id="plan-prev" type="button">이전</button><span id="plan-page"></span><button id="plan-next" type="button">다음</button></div>
+<section id="production-capture" aria-label="선택한 행 상세 부품 정보">
+<h2>선택한 행 상세 · 부품 정보</h2>
+<div class="production-scroll" id="detail-scroll"><table id="plan-selected"><colgroup></colgroup><thead><tr>{% for h in headers %}<th>{% if forloop.counter0 == 4 %}완료{% elif forloop.counter0 == 5 %}잔량{% else %}{{ h }}{% endif %}</th>{% endfor %}</tr></thead><tbody></tbody></table></div>
+<dl id="plan-parts">{% for h in part_headers %}<div><dt>{{ h }}</dt><dd>—</dd></div>{% endfor %}</dl>
+</section>
+{{ plan_data|json_script:'production-data' }}
+<script src="{% static 'inventory/production_plan.js' %}" defer></script>
+{% else %}<p class="notice">아직 적용된 생산계획이 없습니다.{% if user.is_staff %} 엑셀 파일을 열고 열 연결을 확인해 주세요.{% else %} 관리자에게 생산계획 업로드를 요청해 주세요.{% endif %}</p>{% endif %}
+</div>
+{% endblock %}
