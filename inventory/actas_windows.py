@@ -32,7 +32,7 @@ def inspect_windows():
     user.IsWindowVisible.argtypes = [wintypes.HWND]
     user.IsWindowEnabled.argtypes = [wintypes.HWND]
     user.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
-    roots = []
+    roots, visible_windows = [], []
 
     def text(handle, kind='title'):
         buffer = ctypes.create_unicode_buffer(256)
@@ -42,14 +42,20 @@ def inspect_windows():
     @callback
     def visit(handle, unused):
         title = text(handle)
-        if 'actas' in title.lower() and user.IsWindowVisible(handle):
+        if user.IsWindowVisible(handle):
             pid = wintypes.DWORD()
             user.GetWindowThreadProcessId(handle, ctypes.byref(pid))
-            # Window titles can contain a signed-in person's name. Do not emit it.
-            roots.append({'handle': int(handle), 'process_id': pid.value,
-                          'class_name': text(handle, 'class'), 'controls': []})
+            visible_windows.append((handle, pid.value, 'actas' in title.lower()))
         return True
     user.EnumWindows(visit, 0)
+    actas_pids = {pid for handle, pid, matched in visible_windows if matched}
+    # Save As is an owned TOP-LEVEL window, not a descendant of the main
+    # window. Include the same process's dialogs without exposing their titles.
+    for handle, pid, matched in visible_windows:
+        if pid in actas_pids:
+            roots.append({'handle': int(handle), 'process_id': pid,
+                          'owner': int(user.GetParent(handle) or 0),
+                          'class_name': text(handle, 'class'), 'controls': []})
     labels = ('창고', '조회', '엑셀', '현재고 현황', '저장', '파일', '취소', '확인', 'Y01', 'Y02', 'Y09')
     for root in roots:
         @callback
