@@ -1,0 +1,2 @@
+# Optional on the interactive Windows collector only. Core ERP is unchanged.
+pywinauto==0.6.9; sys_platform == "win32"
