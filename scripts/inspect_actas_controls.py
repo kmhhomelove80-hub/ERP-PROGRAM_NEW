@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import re
+import sys
 import time
 
 def is_actas_root(title, class_name):
@@ -187,6 +188,10 @@ def inspect_accessibility(report, timeout=30):
         return {'status': 'unavailable', 'windows': []}
 
 if __name__ == '__main__':
+    # Korean output also works when stdout is redirected on non-Korean Windows.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8', errors='replace')
     p = argparse.ArgumentParser(description='Actas 읽기 전용 상세 진단 v2')
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--delay', type=int, default=12)
