@@ -2,6 +2,8 @@ from datetime import timedelta
 import io
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 from unittest import skipUnless
@@ -170,6 +172,14 @@ class ActasCollectionTests(TestCase):
         with path.open('wb') as stream:stream.truncate(collector.MAX_BYTES + 1)
         with self.assertRaises(RuntimeError):collector.wait_for_export(path, timeout=.05, quiet=0)
 
+    def test_explorer_and_browser_titles_are_not_erp_windows(self):
+        from .actas_windows import is_actas_root
+        self.assertFalse(is_actas_root('Actas-controls-warehouse-3.json', 'CabinetWClass'))
+        self.assertFalse(is_actas_root('ActasERP - Browser', 'Chrome_WidgetWin_1'))
+        self.assertFalse(is_actas_root('ActasErp_New', 'CabinetWClass'))
+        self.assertTrue(is_actas_root('ActasERP 사업장: 테스트', 'FNWND3105'))
+        self.assertFalse(is_actas_root('현재고 현황', 'FNWND3105'))
+
     @skipUnless(os.name == 'nt', 'Native Windows file sharing check')
     def test_native_windows_open_writer_must_close_before_export_is_read(self):
         path = Path(self.temp.name) / 'writing.xls'
@@ -194,3 +204,67 @@ class ActasCollectionTests(TestCase):
         profile = Path(self.temp.name) / 'profile.json'
         profile.write_text(json.dumps({'schema': 1, 'verified_on_this_pc': False}))
         with self.assertRaises(RuntimeError):ActasExporter(profile)
+
+    @skipUnless(os.name == 'nt', 'Native .NET 4 accessibility reader without UI changes')
+    def test_native_standalone_detail_diagnostic_uses_existing_windows_libraries(self):
+        output = Path(self.temp.name) / 'detail.json'
+        script = Path(__file__).resolve().parent.parent / 'scripts/inspect_actas_controls.py'
+        result = subprocess.run([sys.executable, str(script), '--delay', '0', '--output', str(output)],
+                                capture_output=True, encoding='utf-8', errors='replace', timeout=45)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        report = json.loads(output.read_text(encoding='utf-8'))
+        self.assertEqual(report['diagnostic_version'], 2)
+        self.assertEqual(report['accessibility']['status'], 'complete')
+
+    @skipUnless(os.name == 'nt', 'Own disposable Win32 window, menu and password field')
+    def test_native_diagnostic_filters_titles_and_reads_only_own_menu_metadata(self):
+        import ctypes
+        from ctypes import wintypes as wt
+        from .actas_windows import inspect_windows
+        user, kernel = ctypes.WinDLL('user32'), ctypes.WinDLL('kernel32')
+        proc_type = ctypes.WINFUNCTYPE(ctypes.c_ssize_t, wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM)
+        user.DefWindowProcW.argtypes = [wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM]
+        user.DefWindowProcW.restype = ctypes.c_ssize_t
+        @proc_type
+        def proc(handle, message, wp, lp):return user.DefWindowProcW(handle, message, wp, lp)
+        class WindowClass(ctypes.Structure):
+            _fields_ = [('style', wt.UINT), ('proc', proc_type), ('cls_extra', ctypes.c_int),
+                        ('wnd_extra', ctypes.c_int), ('instance', wt.HINSTANCE), ('icon', wt.HICON),
+                        ('cursor', wt.HANDLE), ('brush', wt.HBRUSH), ('menu_name', wt.LPCWSTR), ('name', wt.LPCWSTR)]
+        kernel.GetModuleHandleW.argtypes = [wt.LPCWSTR]
+        kernel.GetModuleHandleW.restype = wt.HMODULE
+        instance = kernel.GetModuleHandleW(None)
+        cls = WindowClass()
+        cls.proc, cls.instance, cls.name = proc, instance, 'FNWND999901'
+        user.RegisterClassW.argtypes = [ctypes.POINTER(WindowClass)]
+        user.UnregisterClassW.argtypes = [wt.LPCWSTR, wt.HINSTANCE]
+        user.CreateWindowExW.argtypes = [wt.DWORD, wt.LPCWSTR, wt.LPCWSTR, wt.DWORD, ctypes.c_int,
+                                         ctypes.c_int, ctypes.c_int, ctypes.c_int, wt.HWND, wt.HMENU, wt.HINSTANCE, ctypes.c_void_p]
+        user.CreateWindowExW.restype = wt.HWND
+        user.CreateMenu.restype = wt.HMENU
+        user.AppendMenuW.argtypes = [wt.HMENU, wt.UINT, ctypes.c_size_t, wt.LPCWSTR]
+        user.SetMenu.argtypes = [wt.HWND, wt.HMENU]
+        user.DestroyWindow.argtypes = [wt.HWND]
+        user.DestroyMenu.argtypes = [wt.HMENU]
+        self.assertTrue(user.RegisterClassW(ctypes.byref(cls)))
+        window, menu = None, None
+        try:
+            window = user.CreateWindowExW(0, cls.name, 'ActasERP Diagnostic Fixture', 0x10CF0000,
+                                           0, 0, 240, 140, None, None, instance, None)
+            self.assertTrue(window)
+            menu = user.CreateMenu()
+            self.assertTrue(user.AppendMenuW(menu, 0, 991, '조회'))
+            self.assertTrue(user.SetMenu(window, menu))
+            field = user.CreateWindowExW(0, 'Edit', 'synthetic-password-do-not-emit', 0x50000020,
+                                         5, 5, 150, 25, window, 992, instance, None)
+            self.assertTrue(field)
+            report = inspect_windows()
+            root = next(w for w in report['windows'] if w['handle'] == window)
+            self.assertTrue(any(m['command_id'] == 991 and m['label'] == '조회' for m in root['menus']))
+            self.assertTrue(any(c['class_name'] == 'Edit' and c['control_id'] == 992 for c in root['controls']))
+            self.assertNotIn('synthetic-password-do-not-emit', json.dumps(report))
+            self.assertIn('focus', root)
+        finally:
+            if window:user.DestroyWindow(window)
+            if menu:user.DestroyMenu(menu)
+            user.UnregisterClassW(cls.name, instance)

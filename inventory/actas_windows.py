@@ -10,6 +10,12 @@ import re
 import time
 
 
+def is_actas_root(title, class_name):
+    # A directory/browser title containing "Actas" is NOT the ERP process.
+    return bool(re.match(r'^FNWND\d+$', class_name, re.I) and
+                re.match(r'^Actas\s*ERP(?:\b|_)', title.strip(), re.I))
+
+
 def inspect_windows():
     """Read-only Win32 inspection; no optional package or admin rights required.
 
@@ -32,6 +38,21 @@ def inspect_windows():
     user.IsWindowVisible.argtypes = [wintypes.HWND]
     user.IsWindowEnabled.argtypes = [wintypes.HWND]
     user.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    user.GetForegroundWindow.restype = wintypes.HWND
+    class GuiThreadInfo(ctypes.Structure):
+        _fields_ = [('cbSize', wintypes.DWORD), ('flags', wintypes.DWORD),
+                    ('active', wintypes.HWND), ('focus', wintypes.HWND), ('capture', wintypes.HWND),
+                    ('menu_owner', wintypes.HWND), ('move_size', wintypes.HWND),
+                    ('caret', wintypes.HWND), ('caret_rect', wintypes.RECT)]
+    user.GetGUIThreadInfo.argtypes = [wintypes.DWORD, ctypes.POINTER(GuiThreadInfo)]
+    user.GetMenu.argtypes = [wintypes.HWND]
+    user.GetMenu.restype = wintypes.HMENU
+    user.GetSubMenu.argtypes = [wintypes.HMENU, ctypes.c_int]
+    user.GetSubMenu.restype = wintypes.HMENU
+    user.GetMenuItemCount.argtypes = [wintypes.HMENU]
+    user.GetMenuItemID.argtypes = [wintypes.HMENU, ctypes.c_int]
+    user.GetMenuItemID.restype = wintypes.UINT
+    user.GetMenuStringW.argtypes = [wintypes.HMENU, wintypes.UINT, wintypes.LPWSTR, ctypes.c_int, wintypes.UINT]
     roots, visible_windows = [], []
 
     def text(handle, kind='title'):
@@ -45,7 +66,7 @@ def inspect_windows():
         if user.IsWindowVisible(handle):
             pid = wintypes.DWORD()
             user.GetWindowThreadProcessId(handle, ctypes.byref(pid))
-            visible_windows.append((handle, pid.value, 'actas' in title.lower()))
+            visible_windows.append((handle, pid.value, is_actas_root(title, text(handle, 'class'))))
         return True
     user.EnumWindows(visit, 0)
     actas_pids = {pid for handle, pid, matched in visible_windows if matched}
@@ -71,8 +92,104 @@ def inspect_windows():
                                      'enabled': bool(user.IsWindowEnabled(handle))})
             return True
         user.EnumChildWindows(root['handle'], child, 0)
-    return {'schema': 1, 'kind': 'read-only-control-inspection', 'windows': roots,
+        tid = user.GetWindowThreadProcessId(root['handle'], None)
+        state = GuiThreadInfo()
+        state.cbSize = ctypes.sizeof(state)
+        root['foreground'] = user.GetForegroundWindow() == root['handle']
+        if user.GetGUIThreadInfo(tid, ctypes.byref(state)):
+            root['focus'] = {'handle': int(state.focus or 0), 'class_name': text(state.focus, 'class') if state.focus else '',
+                             'control_id': user.GetDlgCtrlID(state.focus) if state.focus else 0,
+                             'caret_handle': int(state.caret or 0)}
+        entries = []
+        def menu_items(menu, path=(), depth=0):
+            if not menu or depth > 8 or len(entries) >= 500:
+                return
+            for index in range(max(0, min(user.GetMenuItemCount(menu), 100))):
+                buffer = ctypes.create_unicode_buffer(128)
+                user.GetMenuStringW(menu, index, buffer, 128, 0x400)
+                caption = buffer.value.replace('&', '').split('\t')[0].strip()
+                # Never export recent-file paths or other application contents.
+                if re.fullmatch(r'(조회|엑셀|Excel|창고|저장|파일|내보내기)(\([A-Za-z0-9]+\))?', caption, re.I):
+                    entries.append({'path': list(path + (index,)), 'label': caption,
+                                    'command_id': user.GetMenuItemID(menu, index)})
+                menu_items(user.GetSubMenu(menu, index), path + (index,), depth + 1)
+        menu_items(user.GetMenu(root['handle']))
+        root['menus'] = entries
+    return {'schema': 2, 'kind': 'read-only-control-inspection', 'windows': roots,
             'note': '입력값·비밀번호·재고 표 내용은 수집하지 않습니다. 자동 조작은 실행하지 않았습니다.'}
+
+
+ACCESSIBILITY_COMMAND = r"""
+$ErrorActionPreference='Stop'
+[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+$inputData=$env:SUNIL_ACTAS_INSPECTION|ConvertFrom-Json
+$walker=[System.Windows.Automation.TreeWalker]::RawViewWalker
+$clock=[Diagnostics.Stopwatch]::StartNew()
+$rows=@(foreach($root in $inputData.windows){
+  $nodes=New-Object Collections.ArrayList
+  try {
+    $element=[System.Windows.Automation.AutomationElement]::FromHandle([intptr][long]$root.handle)
+    if($element.Current.ProcessId -ne $root.process_id){throw 'Process changed'}
+    $queue=New-Object Collections.Queue
+    $queue.Enqueue(@($element,0,-1))
+    while($queue.Count -gt 0 -and $nodes.Count -lt 600 -and $clock.Elapsed.TotalSeconds -lt 20){
+      $work=$queue.Dequeue(); $item=$work[0]; $depth=[int]$work[1]; $parentIndex=[int]$work[2]
+      try {
+        $current=$item.Current
+        if($current.ProcessId -ne $root.process_id){continue}
+        $kind=$current.ControlType.ProgrammaticName
+        $label=''
+        if(-not $current.IsPassword -and $kind -in @('ControlType.Button','ControlType.MenuItem','ControlType.Text')){
+          $caption=$current.Name.Replace('&','').Trim()
+          if($caption -match '^(조회|엑셀|Excel|창고|현재고\s*현황|저장|취소|파일\s*이름)(\([A-Za-z0-9]+\))?$'){$label=$caption}
+        }
+        $identity=''
+        if($kind -ne 'ControlType.DataItem' -and $current.AutomationId -match '^[A-Za-z_][A-Za-z0-9_.-]{0,80}$|^[0-9.]{1,40}$'){$identity=$current.AutomationId}
+        $patterns=@($item.GetSupportedPatterns()|ForEach-Object{$_.ProgrammaticName})
+        $index=$nodes.Count
+        [void]$nodes.Add([pscustomobject]@{parent=$parentIndex;type=$kind;class_name=$current.ClassName;automation_id=$identity;label=$label;password=[bool]$current.IsPassword;enabled=[bool]$current.IsEnabled;offscreen=[bool]$current.IsOffscreen;patterns=$patterns})
+        if($depth -lt 12){
+          $child=$walker.GetFirstChild($item); $siblings=0
+          while($null -ne $child -and $siblings -lt 200 -and $queue.Count -lt 1200){
+            $queue.Enqueue(@($child,($depth+1),$index)); $child=$walker.GetNextSibling($child);$siblings++
+          }
+        }
+      } catch { }
+    }
+    [pscustomobject]@{handle=$root.handle;nodes=@($nodes.ToArray());bounded=($queue.Count -gt 0)}
+  } catch {[pscustomobject]@{handle=$root.handle;nodes=@();status='unavailable'}}
+})
+@{status='complete';windows=$rows}|ConvertTo-Json -Depth 9 -Compress
+"""
+
+
+def inspect_accessibility(report, timeout=30):
+    """Read metadata with the existing Windows .NET 4 UIAutomation libraries.
+
+    Never invokes patterns, reads Value/Text patterns, selects, or changes focus.
+    The reader has its own timeout and cannot terminate Actas.
+    """
+    import subprocess
+    if os.name != 'nt':
+        raise RuntimeError('Windows 읽기 전용 진단입니다.')
+    powershell = Path(os.environ['SystemRoot']) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
+    env = os.environ.copy()
+    env['PSModulePath'] = str(powershell.parent / 'Modules')
+    env['SUNIL_ACTAS_INSPECTION'] = json.dumps({'windows': [
+        {'handle': w['handle'], 'process_id': w['process_id']} for w in report['windows']]})
+    try:
+        result = subprocess.run([str(powershell), '-NoProfile', '-NonInteractive', '-Command', ACCESSIBILITY_COMMAND],
+                                capture_output=True, encoding='utf-8', errors='replace', timeout=timeout,
+                                creationflags=subprocess.CREATE_NO_WINDOW, env=env)
+        if result.returncode:
+            return {'status': 'unavailable', 'windows': []}
+        return json.loads(result.stdout)
+    except subprocess.TimeoutExpired:
+        return {'status': 'reader_timeout', 'windows': []}
+    except (OSError, ValueError):
+        return {'status': 'unavailable', 'windows': []}
 
 
 def require_interactive_desktop():
