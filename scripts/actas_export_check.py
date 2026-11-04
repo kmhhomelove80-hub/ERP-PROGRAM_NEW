@@ -206,6 +206,7 @@ class WindowsActas:
             'GetWindowTextW': ([wt.HWND, wt.LPWSTR, ctypes.c_int], ctypes.c_int),
             'GetClassNameW': ([wt.HWND, wt.LPWSTR, ctypes.c_int], ctypes.c_int),
             'GetDlgCtrlID': ([wt.HWND], ctypes.c_int), 'GetParent': ([wt.HWND], wt.HWND),
+            'GetWindowLongW': ([wt.HWND, ctypes.c_int], wt.LONG),
             'IsWindowVisible': ([wt.HWND], wt.BOOL), 'IsWindowEnabled': ([wt.HWND], wt.BOOL),
             'IsWindow': ([wt.HWND], wt.BOOL), 'GetForegroundWindow': ([], wt.HWND),
             'GetAsyncKeyState': ([ctypes.c_int], wt.SHORT),
@@ -277,6 +278,8 @@ class WindowsActas:
             raise RuntimeError('Actas 화면을 활성화하지 못했습니다. 자동 입력을 중단합니다.')
 
     def message(self, handle, message, wp=0, lp=0, timeout=3000):
+        if self.pid(handle)[0] != self.process:
+            raise RuntimeError('Actas의 제어 대상이 바뀌어 조작을 중단합니다.')
         result = self.c.c_size_t()
         if not self.u.SendMessageTimeoutW(handle, message, wp, lp, 2, timeout, self.c.byref(result)):
             raise RuntimeError('Actas 화면이 응답하지 않아 조작을 중단했습니다.')
@@ -338,11 +341,18 @@ class WindowsActas:
 
     def select_and_query(self, warehouse):
         if warehouse not in ('Y02', 'Y09'):raise RuntimeError('Y02·Y09만 검증합니다.')
+        self.guard()
+        self.stock = self.child(self.main, 'FNWND3105', 200)
+        if self.text(self.stock).strip() != '현재고 현황':raise RuntimeError('현재고 현황이 아닙니다.')
+        self.conditions = self.child(self.stock, 'pbdw105', 1002, direct=True)
+        self.editor = self.child(self.conditions, 'Edit', 10, direct=True)
         self.activate(self.conditions, self.main)
         deadline = time.monotonic() + 5
         while not self.u.IsWindowVisible(self.editor) and time.monotonic() < deadline:time.sleep(.1)
         if not self.u.IsWindowVisible(self.editor):
             raise RuntimeError('창고 코드 칸을 클릭해 선택해 둔 뒤 다시 실행하세요. 화면 좌표를 추정하지 않습니다.')
+        if self.u.GetWindowLongW(self.editor, -16) & (0x20 | 0x800):
+            raise RuntimeError('비밀번호 또는 읽기 전용 입력란에는 접근하지 않습니다.')
         before = self.read_edit(self.editor).strip()
         if not re.fullmatch(r'Y\d{2}', before):
             raise RuntimeError('선택된 칸이 창고 코드 칸인지 확인하지 못했습니다. 입력하지 않습니다.')
