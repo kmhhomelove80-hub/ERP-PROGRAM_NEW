@@ -79,31 +79,58 @@ def inspect_export(data):
     if any(headers.count(h) != 1 for h in required):
         raise RuntimeError('품목코드·품목명·현재고·출하대기 열이 필요합니다.')
     indexes = {h: headers.index(h) for h in required}
-    seen, records, quantity, pending, negative = set(), [], 0, 0, 0
-    for row in table[1:]:
+    seen, records = set(), []
+    totals = {'현재고': Decimal(0), '출하대기': Decimal(0)}
+    blanks = {'현재고': 0, '출하대기': 0}
+    fractions = {'현재고': 0, '출하대기': 0}
+    samples = {field: {'blank': [], 'fractional': []} for field in totals}
+    negative = 0
+    for number, row in enumerate(table[1:], 2):
         if not any(v.strip() for v in row):continue
-        if len(row) <= max(indexes.values()):raise RuntimeError('일부 행의 열이 누락됐습니다.')
+        if len(row) <= max(indexes.values()):raise RuntimeError(f'{number}행: 일부 열이 누락됐습니다.')
         code = row[indexes['품목코드']].strip()
         if not code and row[0].strip() == '합계':continue
         if not code or len(code) > 100 or code.startswith(('=', '#')) or code in seen:
-            raise RuntimeError('빈 코드·중복 코드·잘못된 품목코드가 있습니다.')
+            raise RuntimeError(f'{number}행 품목코드: 빈 값·중복·잘못된 코드가 있습니다.')
         values = []
         for field in ('현재고', '출하대기'):
+            raw = row[indexes[field]].strip()
+            if not raw:
+                # Preserve unknown/blank, never assume a displayed blank is 0.
+                blanks[field] += 1
+                if len(samples[field]['blank']) < 5:samples[field]['blank'].append({'row': number, 'value': None})
+                values.append(None)
+                continue
             try:
-                value = Decimal(row[indexes[field]].strip().replace(',', ''))
-                if not value.is_finite() or value != value.to_integral_value() or not -2147483648 <= value <= 2147483647:
+                value = Decimal(raw.replace(',', ''))
+                if not value.is_finite() or not -2147483648 <= value <= 2147483647:
                     raise InvalidOperation
-                values.append(int(value))
+                if value.as_tuple().exponent < -12 or len(value.as_tuple().digits) > 30:
+                    raise InvalidOperation
             except InvalidOperation:
-                raise RuntimeError('현재고·출하대기는 원본 정수 수량이어야 합니다.') from None
+                raise RuntimeError(f'{number}행 {field}: 유효한 원본 수량인지 확인하세요. 소수·음수는 허용합니다.') from None
+            if value != value.to_integral_value():
+                fractions[field] += 1
+                if len(samples[field]['fractional']) < 5:samples[field]['fractional'].append({'row': number, 'value': raw})
+            totals[field] += value
+            if field == '현재고' and value < 0:negative += 1
+            # Plain exact decimal strings (no binary float / rounding).
+            values.append('0' if value == 0 else format(value.normalize(), 'f'))
         seen.add(code)
-        quantity += values[0]
-        pending += values[1]
-        negative += values[0] < 0
         records.append((code, *values))
     if not records:raise RuntimeError('빈 재고 자료는 검증 성공으로 처리하지 않습니다.')
     canonical = json.dumps(sorted(records), ensure_ascii=False, separators=(',', ':')).encode('utf-8')
-    return {'items': len(records), 'quantity': quantity, 'shipping_pending': pending,
+    def complete_total(field):
+        if blanks[field]:return None
+        value = totals[field]
+        return int(value) if value == value.to_integral_value() else format(value, 'f')
+    return {'items': len(records), 'quantity': complete_total('현재고'), 'shipping_pending': complete_total('출하대기'),
+            'quantity_nonblank_sum': format(totals['현재고'], 'f'),
+            'shipping_pending_nonblank_sum': format(totals['출하대기'], 'f'),
+            'blank_quantity_items': blanks['현재고'], 'blank_shipping_pending_items': blanks['출하대기'],
+            'fractional_quantity_items': fractions['현재고'], 'fractional_shipping_pending_items': fractions['출하대기'],
+            'integer_quantity_compatible': not any((*blanks.values(), *fractions.values())),
+            'original_quantities_preserved': True, 'samples': samples,
             'negative_quantity_items': negative, 'sha256': hashlib.sha256(data).hexdigest(),
             'inventory_digest': hashlib.sha256(canonical).hexdigest()}
 
@@ -153,7 +180,7 @@ def run_check(adapter, root, confirm, progress=print, reader=wait_file):
     root.mkdir(parents=True, exist_ok=True)
     run = root / uuid.uuid4().hex
     run.mkdir()
-    report = {'format': 1, 'kind': 'Actas-export-pilot-NOT-import', 'started_at': now(),
+    report = {'format': 2, 'pilot_version': 2, 'kind': 'Actas-export-pilot-NOT-import', 'started_at': now(),
               'phase': 'running', 'files': {}, 'registered_in_sunil': False,
               'automatic_query_completion_verified': False}
     save_json(run / 'result.json', report)
@@ -172,19 +199,26 @@ def run_check(adapter, root, confirm, progress=print, reader=wait_file):
             if path.exists():raise RuntimeError('새 파일 경로가 비어 있지 않습니다.')
             adapter.save_export(path)
             data = reader(path)
-            summary = inspect_export(data)
-            report['files'][warehouse] = {**summary, 'name': path.name,
-                                          'query_confirmed_by': 'operator', 'query_confirmed_at': acknowledged,
-                                          'saved_at': now()}
+            report['files'][warehouse] = {'name': path.name, 'sha256': hashlib.sha256(data).hexdigest(),
+                                          'parse_status': 'pending', 'query_confirmed_by': 'operator',
+                                          'query_confirmed_at': acknowledged, 'saved_at': now()}
             save_json(run / 'result.json', report)
-            progress(f"{warehouse}: {summary['items']}품목 / 현재고 합계 {summary['quantity']}")
+            try:
+                summary = inspect_export(data)
+            except Exception:
+                report['files'][warehouse]['parse_status'] = 'invalid'
+                raise
+            report['files'][warehouse].update(summary, parse_status='valid')
+            save_json(run / 'result.json', report)
+            total = summary['quantity'] if summary['quantity'] is not None else '공란 포함 · 합계 미확정'
+            progress(f"{warehouse}: {summary['items']}품목 / 현재고 합계 {total} / 소수 {summary['fractional_quantity_items']}품목")
         if report['files']['Y02']['inventory_digest'] == report['files']['Y09']['inventory_digest']:
             raise RuntimeError('두 창고의 코드·수량 자료가 같습니다. 창고 전환 여부를 확인해야 합니다.')
         report.update(phase='exports_validated', completed_at=now())
         save_json(run / 'result.json', report)
         return run, report
     except Exception as error:
-        report.update(phase='failed', failed_at=now(), failure_type=type(error).__name__)
+        report.update(phase='failed', failed_at=now(), failure_type=type(error).__name__, failure_message=str(error))
         save_json(run / 'result.json', report)
         progress('중단 기록: ' + str(run / 'result.json'))
         raise
@@ -400,6 +434,14 @@ class WindowsActas:
             raise RuntimeError('저장창이 닫히지 않았습니다. 추가 메시지가 있는지 확인하세요.')
 
 
+
+def confirm_token(expected, prompt):
+    while True:
+        answer = input(prompt).strip()
+        if not answer:return False
+        if answer.casefold() == expected.casefold():return True
+        print(f'지금은 {expected} 확인 단계입니다. {expected}를 입력하거나 Enter로 중단하세요.')
+
 def main():
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, 'reconfigure'):stream.reconfigure(encoding='utf-8', errors='replace')
@@ -408,15 +450,16 @@ def main():
     args = parser.parse_args()
     print('Actas 현재고 현황에서 검색·분류 조건을 전체로 하고 창고 코드 칸을 선택해 두세요.')
     print('다른 사람이 Actas를 조작하지 않도록 하고, 실행 중 마우스·키보드는 확인 단계에서만 사용하세요.')
-    if input('준비됐다면 START를 입력하세요. 취소하려면 Enter: ').strip() != 'START':return 1
+    if not confirm_token('START', '준비됐다면 START 또는 start를 입력하세요. 취소하려면 Enter: '):return 1
     def confirm(warehouse):
         print(f'Actas에서 창고 코드 {warehouse}가 유지되고 해당 창고의 조회 표가 갱신됐는지 직접 확인하세요.')
         print('확인 후 이 PowerShell로 돌아오세요. 아직 갱신 중이면 기다리세요.')
-        return input(f'완료를 확인했다면 {warehouse}를 입력, 중단하려면 Enter: ').strip() == warehouse
+        return confirm_token(warehouse, f'완료를 확인했다면 {warehouse}를 입력, 중단하려면 Enter: ')
     try:
         with single_pilot():
             folder, report = run_check(WindowsActas(), args.output_root, confirm)
-        print('두 파일 검증 완료. SUNIL ERP 등록·실제 재고 변경은 하지 않았습니다.')
+        print('두 파일 저장·원본 형식 확인 완료. 소수·음수·공란을 그대로 보존했습니다.')
+        print('SUNIL ERP 등록·실제 재고 변경은 하지 않았습니다.')
         print('결과 파일:', folder / 'result.json')
         return 0
     except Exception as error:

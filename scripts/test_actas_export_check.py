@@ -64,12 +64,54 @@ class PilotTests(unittest.TestCase):
         report=json.loads(next(self.root.glob('*/result.json')).read_text(encoding='utf-8'))
         self.assertEqual(report['phase'],'failed')
     def test_duplicate_codes_bad_quantities_and_wrong_format_rejected(self):
-        for raw in (b'partial', data()+data().split(b'\r\n',1)[1],data(quantity='1.5'),data(quantity='NaN')):
+        for raw in (b'partial', data()+data().split(b'\r\n',1)[1],data(quantity='NaN'),data(quantity='1e-999999')):
             with self.subTest(raw=raw),self.assertRaises(RuntimeError):p.inspect_export(raw)
     def test_negative_values_and_original_code_are_preserved(self):
         report=p.inspect_export(data('ABC-001*',-4))
         self.assertEqual(report['items'],1);self.assertEqual(report['quantity'],-4)
         self.assertEqual(report['negative_quantity_items'],1)
+    def test_fractional_and_negative_fractional_quantities_are_valid(self):
+        report=p.inspect_export(data(quantity='-565.9'))
+        self.assertEqual(report['quantity'],'-565.9')
+        self.assertEqual(report['fractional_quantity_items'],1)
+        self.assertEqual(report['negative_quantity_items'],1)
+        self.assertFalse(report['integer_quantity_compatible'])
+        self.assertEqual(report['samples']['현재고']['fractional'],[{'row':2,'value':'-565.9'}])
+    def test_blank_is_not_zero_and_complete_total_is_not_invented(self):
+        raw=data(quantity='').replace(b'\t1\r\n',b'\t\r\n',1)
+        report=p.inspect_export(raw)
+        self.assertIsNone(report['quantity']);self.assertIsNone(report['shipping_pending'])
+        self.assertEqual(report['blank_quantity_items'],1)
+        self.assertEqual(report['blank_shipping_pending_items'],1)
+        self.assertFalse(report['integer_quantity_compatible'])
+        self.assertNotEqual(report['inventory_digest'],p.inspect_export(data(quantity=0))['inventory_digest'])
+    def test_decimal_sum_is_exact_not_binary_float(self):
+        raw=('품목코드\t품목명\t현재고\t출하대기\r\nA\t테스트\t0.1\t0.2\r\nB\t테스트\t0.2\t0.1\r\n').encode('cp949')
+        report=p.inspect_export(raw)
+        self.assertEqual(report['quantity'],'0.3');self.assertEqual(report['shipping_pending'],'0.3')
+    def test_identical_inventory_detected_despite_decimal_display_scale(self):
+        self.assertEqual(p.inspect_export(data(quantity='1.0'))['inventory_digest'],
+                         p.inspect_export(data(quantity='1'))['inventory_digest'])
+        self.assertEqual(p.inspect_export(data(quantity='-0.0'))['inventory_digest'],
+                         p.inspect_export(data(quantity='0'))['inventory_digest'])
+    def test_bad_quantity_error_identifies_row_and_field(self):
+        with self.assertRaisesRegex(RuntimeError,'2행 현재고'):p.inspect_export(data(quantity='not-a-number'))
+    def test_fractional_source_does_not_stop_second_export(self):
+        adapter=Fixture()
+        original=adapter.save_export
+        def fractional(path):
+            original(path)
+            if adapter.warehouse=='Y02':path.write_bytes(data('Y02','1.5'))
+        adapter.save_export=fractional
+        run,report=self.run_pilot(adapter)
+        self.assertEqual(report['phase'],'exports_validated')
+        self.assertEqual(set(report['files']),{'Y02','Y09'})
+        self.assertFalse(report['registered_in_sunil'])
+    def test_confirmation_ignores_case_and_reprompts_wrong_warehouse(self):
+        with patch('builtins.input',side_effect=['y09','y02']),patch('builtins.print'):
+            self.assertTrue(p.confirm_token('Y02','test: '))
+        with patch('builtins.input',return_value='start'):
+            self.assertTrue(p.confirm_token('START','test: '))
     def test_open_or_missing_export_is_not_success(self):
         path=self.root/'not-saved.xls'
         with self.assertRaises(RuntimeError):p.wait_file(path,timeout=.05,quiet=0)
