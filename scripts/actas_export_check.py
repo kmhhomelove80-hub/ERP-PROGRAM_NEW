@@ -540,7 +540,8 @@ def main():
     if not confirm_token('START', '준비되면 start를 입력하세요. 취소하려면 Enter: '):return 1
     try:
         with single_pilot():
-            folder, report = probe_input(WindowsActas(), args.output_root, args.probe_warehouse)
+            folder, report = probe_input(WindowsActas(), args.output_root, args.probe_warehouse,
+                                         progress=lambda message: print(message, flush=True))
         print('키 입력 확인이 끝났습니다. 창고 코드와 오른쪽 창고명을 직접 확인해 주세요.')
         print('조회·파일 추출·SUNIL ERP 등록은 실행하지 않았습니다.')
         print('결과 파일:', folder / 'input-probe.json')
