@@ -40,8 +40,9 @@ def collection_lock(root):
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
     stream = (root / 'collector.lock').open('a+b')
-    stream.seek(0)
-    if not stream.read(1):
+    # A Windows byte lock denies even a read of byte zero by a second opener.
+    # Inspect file length without reading that locked byte.
+    if os.fstat(stream.fileno()).st_size == 0:
         stream.write(b'0')
         stream.flush()
     stream.seek(0)
