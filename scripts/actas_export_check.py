@@ -1,7 +1,8 @@
-"""Interactive Actas export PILOT. No database/API/config/credential access.
+"""Actas warehouse INPUT probe. CLI does not query, export or import.
 
-Only confirmed stock-window selectors, Ctrl+R, Ctrl+E and the owned Save As
-dialog are used. A person MUST confirm each completed query. No auto import.
+Real key input + Tab/Shift+Tab checks replace WM_SETTEXT-only warehouse writes.
+Legacy export helpers are retained for tests; the batch CLI is disabled pending
+onsite validation. No direct database/config/credential access.
 """
 import argparse
 from contextlib import contextmanager
@@ -132,7 +133,8 @@ def inspect_export(data):
             'integer_quantity_compatible': not any((*blanks.values(), *fractions.values())),
             'original_quantities_preserved': True, 'samples': samples,
             'negative_quantity_items': negative, 'sha256': hashlib.sha256(data).hexdigest(),
-            'inventory_digest': hashlib.sha256(canonical).hexdigest()}
+            'inventory_digest': hashlib.sha256(canonical).hexdigest(),
+            'code_set_digest': hashlib.sha256(json.dumps(sorted(seen), ensure_ascii=False).encode('utf-8')).hexdigest()}
 
 
 def read_closed(path):
@@ -180,9 +182,9 @@ def run_check(adapter, root, confirm, progress=print, reader=wait_file):
     root.mkdir(parents=True, exist_ok=True)
     run = root / uuid.uuid4().hex
     run.mkdir()
-    report = {'format': 2, 'pilot_version': 2, 'kind': 'Actas-export-pilot-NOT-import', 'started_at': now(),
+    report = {'format': 3, 'pilot_version': 3, 'kind': 'Actas-export-pilot-NOT-import', 'started_at': now(),
               'phase': 'running', 'files': {}, 'registered_in_sunil': False,
-              'automatic_query_completion_verified': False}
+              'automatic_query_completion_verified': False, 'warehouse_transition_verified': False}
     save_json(run / 'result.json', report)
     try:
         adapter.preflight()
@@ -214,7 +216,9 @@ def run_check(adapter, root, confirm, progress=print, reader=wait_file):
             progress(f"{warehouse}: {summary['items']}품목 / 현재고 합계 {total} / 소수 {summary['fractional_quantity_items']}품목")
         if report['files']['Y02']['inventory_digest'] == report['files']['Y09']['inventory_digest']:
             raise RuntimeError('두 창고의 코드·수량 자료가 같습니다. 창고 전환 여부를 확인해야 합니다.')
-        report.update(phase='exports_validated', completed_at=now())
+        if report['files']['Y02']['code_set_digest'] == report['files']['Y09']['code_set_digest']:
+            raise RuntimeError('두 파일의 품목 구성이 같아 창고 전환을 입증하지 못했습니다. 수량 변화만으로 성공 처리하지 않습니다.')
+        report.update(phase='export_files_checked', completed_at=now())
         save_json(run / 'result.json', report)
         return run, report
     except Exception as error:
@@ -244,6 +248,8 @@ class WindowsActas:
             'IsWindowVisible': ([wt.HWND], wt.BOOL), 'IsWindowEnabled': ([wt.HWND], wt.BOOL),
             'IsWindow': ([wt.HWND], wt.BOOL), 'GetForegroundWindow': ([], wt.HWND),
             'GetAsyncKeyState': ([ctypes.c_int], wt.SHORT),
+            'IsChild': ([wt.HWND, wt.HWND], wt.BOOL),
+            'GetWindowRect': ([wt.HWND, ctypes.POINTER(wt.RECT)], wt.BOOL),
             'GetWindowThreadProcessId': ([wt.HWND, ctypes.POINTER(wt.DWORD)], wt.DWORD),
             'AttachThreadInput': ([wt.DWORD, wt.DWORD, wt.BOOL], wt.BOOL),
             'SetForegroundWindow': ([wt.HWND], wt.BOOL), 'SetFocus': ([wt.HWND], wt.HWND),
@@ -329,14 +335,26 @@ class WindowsActas:
         self.message(handle, 0x000C, 0, self.c.addressof(buffer))
         if self.read_edit(handle) != value:raise RuntimeError('입력한 코드 또는 저장 경로를 재확인하지 못했습니다.')
 
-    def shortcut(self, purpose):
-        key = {'query': 0x52, 'export': 0x45}.get(purpose)
-        if key is None:raise RuntimeError('조회·추출 외의 키 입력은 허용하지 않습니다.')
+    def focus_state(self):
+        c, wt = self.c, self.wt
+        class State(c.Structure):
+            _fields_ = [('size', wt.DWORD), ('flags', wt.DWORD), ('active', wt.HWND), ('focus', wt.HWND),
+                        ('capture', wt.HWND), ('menu', wt.HWND), ('move', wt.HWND), ('caret', wt.HWND), ('rect', wt.RECT)]
+        self.u.GetGUIThreadInfo.argtypes = [wt.DWORD, c.POINTER(State)]
+        state = State();state.size = c.sizeof(state)
+        if not self.u.GetGUIThreadInfo(self.pid(self.main)[1], c.byref(state)):
+            raise RuntimeError('Actas 입력 포커스를 확인하지 못했습니다.')
+        rect = wt.RECT()
+        if not self.u.GetWindowRect(self.editor, c.byref(rect)):
+            raise RuntimeError('창고 입력란 위치가 바뀌었습니다.')
+        return int(state.focus or 0), (rect.left, rect.top, rect.right, rect.bottom), bool(self.u.IsWindowVisible(self.editor))
+
+    def key_events(self, events, *, editor_required=False, condition_required=False):
         self.guard()
         if self.u.GetForegroundWindow() != self.main:raise RuntimeError('Actas가 활성 화면이 아닙니다.')
         deadline = time.monotonic() + 3
-        while any(self.u.GetAsyncKeyState(k) & 0x8000 for k in (0x10, 0x11, 0x12, 0x5B, 0x5C, 0x0D)):
-            if time.monotonic() >= deadline:raise RuntimeError('Ctrl·Shift·Alt·Windows·Enter 키에서 손을 떼고 진행하세요.')
+        while any(self.u.GetAsyncKeyState(k) & 0x8000 for k in (0x10, 0x11, 0x12, 0x5B, 0x5C, 0x0D, 1, 2)):
+            if time.monotonic() >= deadline:raise RuntimeError('보조키·Enter·마우스 버튼에서 손을 떼고 진행하세요.')
             time.sleep(.05)
         if self.u.GetForegroundWindow() != self.main:raise RuntimeError('확인 중 활성 화면이 바뀌어 키 입력을 중단합니다.')
         c, wt = self.c, self.wt
@@ -346,18 +364,41 @@ class WindowsActas:
             _fields_ = [('x', wt.LONG), ('y', wt.LONG), ('data', wt.DWORD), ('flags', wt.DWORD), ('time', wt.DWORD), ('extra', c.c_size_t)]
         class Union(c.Union):_fields_ = [('keyboard', Key), ('mouse', Mouse)]
         class Input(c.Structure):_fields_ = [('type', wt.DWORD), ('data', Union)]
-        items = (Input * 4)()
-        for event, vk, flags in zip(items, (0x11, key, key, 0x11), (0, 0, 2, 2)):
-            event.type, event.data.keyboard.vk, event.data.keyboard.flags = 1, vk, flags
+        focus, _, visible = self.focus_state()
+        if editor_required and (focus != self.editor or not visible):
+            raise RuntimeError('창고 입력란에 포커스가 없어 키 입력을 중단합니다.')
+        if condition_required and not (focus == self.conditions or self.u.IsChild(self.conditions, focus)):
+            raise RuntimeError('창고 조건 영역 밖으로 포커스가 이동했습니다.')
+        items = (Input * len(events))()
+        for event, (vk, scan, flags) in zip(items, events):
+            event.type = 1
+            event.data.keyboard.vk, event.data.keyboard.scan, event.data.keyboard.flags = vk, scan, flags
         self.u.SendInput.argtypes = [wt.UINT, c.POINTER(Input), c.c_int]
-        sent = self.u.SendInput(4, items, c.sizeof(Input))
-        if sent != 4:
+        sent = self.u.SendInput(len(events), items, c.sizeof(Input))
+        if sent != len(events):
             if sent:
-                release = (Input * 2)()
-                for event, vk in zip(release, (key, 0x11)):
-                    event.type, event.data.keyboard.vk, event.data.keyboard.flags = 1, vk, 2
-                self.u.SendInput(2, release, c.sizeof(Input))
-            raise RuntimeError('단축키를 전송하지 못했습니다. Actas와 같은 권한 수준인지 확인하세요.')
+                ups = [(vk, scan, flags | 2) for vk, scan, flags in events if not flags & 2]
+                release = (Input * len(ups))()
+                for event, (vk, scan, flags) in zip(release, ups):
+                    event.type = 1
+                    event.data.keyboard.vk, event.data.keyboard.scan, event.data.keyboard.flags = vk, scan, flags
+                self.u.SendInput(len(ups), release, c.sizeof(Input))
+            raise RuntimeError('키를 전송하지 못했습니다. Actas와 같은 권한 수준인지 확인하세요.')
+
+    def shortcut(self, purpose):
+        key = {'query': 0x52, 'export': 0x45}.get(purpose)
+        if key is None:raise RuntimeError('조회·추출 외의 단축키는 허용하지 않습니다.')
+        self.key_events([(0x11, 0, 0), (key, 0, 0), (key, 0, 2), (0x11, 0, 2)])
+
+    def wait_input(self, predicate, message, timeout=4):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            self.guard()
+            if self.u.GetForegroundWindow() != self.main:
+                raise RuntimeError('추가 창이 열리거나 활성 화면이 바뀌었습니다. 입력을 중단합니다.')
+            if predicate():return
+            time.sleep(.03)
+        raise RuntimeError(message)
 
     def preflight(self):
         self.desktop()
@@ -373,32 +414,49 @@ class WindowsActas:
         self.conditions = self.child(self.stock, 'pbdw105', 1002, direct=True)
         self.editor = self.child(self.conditions, 'Edit', 10, direct=True)
 
-    def select_and_query(self, warehouse):
+    def enter_warehouse(self, warehouse, *, already_selected=False):
         if warehouse not in ('Y02', 'Y09'):raise RuntimeError('Y02·Y09만 검증합니다.')
         self.guard()
         self.stock = self.child(self.main, 'FNWND3105', 200)
         if self.text(self.stock).strip() != '현재고 현황':raise RuntimeError('현재고 현황이 아닙니다.')
         self.conditions = self.child(self.stock, 'pbdw105', 1002, direct=True)
         self.editor = self.child(self.conditions, 'Edit', 10, direct=True)
-        self.activate(self.conditions, self.main)
-        deadline = time.monotonic() + 5
-        while not self.u.IsWindowVisible(self.editor) and time.monotonic() < deadline:time.sleep(.1)
-        if not self.u.IsWindowVisible(self.editor):
-            raise RuntimeError('창고 코드 칸을 클릭해 선택해 둔 뒤 다시 실행하세요. 화면 좌표를 추정하지 않습니다.')
+        if not already_selected:self.activate(self.conditions, self.main)
+        if self.u.GetForegroundWindow() != self.main or not self.u.IsWindowVisible(self.editor):
+            raise RuntimeError('Actas 창고 코드 칸을 직접 클릭해 선택해 두세요.')
         if self.u.GetWindowLongW(self.editor, -16) & (0x20 | 0x800):
             raise RuntimeError('비밀번호 또는 읽기 전용 입력란에는 접근하지 않습니다.')
+        if self.focus_state()[0] != self.editor:
+            raise RuntimeError('창고 코드 입력란에 커서가 없습니다. 아무 값도 입력하지 않습니다.')
         before = self.read_edit(self.editor).strip()
         if not re.fullmatch(r'Y\d{2}', before):
-            raise RuntimeError('선택된 칸이 창고 코드 칸인지 확인하지 못했습니다. 입력하지 않습니다.')
-        self.activate(self.editor, self.main)
-        self.set_edit(self.editor, warehouse)
-        # Move out and back to the SAME DataWindow cell, without Tab changing
-        # the selected column. The operator then verifies the retrieved table.
-        self.activate(self.stock, self.main)
-        self.activate(self.conditions, self.main)
-        if not self.u.IsWindowVisible(self.editor) or self.read_edit(self.editor).strip() != warehouse:
-            raise RuntimeError('창고 코드가 유지되는지 확인하지 못했습니다.')
+            raise RuntimeError('선택된 칸을 창고 코드 칸으로 확인하지 못했습니다.')
+        # Do NOT use WM_SETTEXT: PowerBuilder may not accept that into its
+        # DataWindow buffer. Real keyboard text + Tab triggers edit/validation.
+        self.message(self.editor, 0x00B1, 0, -1)  # Selection only, not a value write.
+        self.key_events([(8, 0, 0), (8, 0, 2)], editor_required=True)
+        self.wait_input(lambda: self.read_edit(self.editor) == '', '기존 코드 삭제 입력을 확인하지 못했습니다.')
+        events = []
+        for char in warehouse:events.extend([(0, ord(char), 4), (0, ord(char), 6)])
+        self.key_events(events, editor_required=True)
+        self.wait_input(lambda: self.read_edit(self.editor) == warehouse, '실제 키 입력 후 코드를 확인하지 못했습니다.')
+        initial = self.focus_state()
+        self.key_events([(9, 0, 0), (9, 0, 2)], editor_required=True)
+        self.wait_input(lambda: self.focus_state() != initial, 'Tab 입력 확정 후 포커스 전환을 확인하지 못했습니다.')
+        focus = self.focus_state()[0]
+        if not (focus == self.conditions or self.u.IsChild(self.conditions, focus)):
+            raise RuntimeError('Tab 후 다른 영역으로 이동했습니다. 조회는 실행하지 않았습니다.')
+        self.key_events([(0x10, 0, 0), (9, 0, 0), (9, 0, 2), (0x10, 0, 2)], condition_required=True)
+        self.wait_input(lambda: self.focus_state() == initial and self.read_edit(self.editor) == warehouse,
+                        '입력 확정 후 원래 창고 칸의 코드를 재확인하지 못했습니다.')
+        return {'before': before, 'requested': warehouse, 'editor_readback': warehouse,
+                'input_method': 'native_keyboard_then_Tab_ShiftTab', 'tab_transition_observed': True,
+                'warehouse_name_verified': False, 'query_sent': False, 'export_sent': False}
+
+    def select_and_query(self, warehouse):
+        evidence = self.enter_warehouse(warehouse)
         self.shortcut('query')
+        return evidence
 
     def save_export(self, path):
         self.activate(self.stock, self.main)
@@ -442,29 +500,54 @@ def confirm_token(expected, prompt):
         if answer.casefold() == expected.casefold():return True
         print(f'지금은 {expected} 확인 단계입니다. {expected}를 입력하거나 Enter로 중단하세요.')
 
+def probe_input(adapter, root, warehouse, *, delay=12, progress=print):
+    root = Path(root);root.mkdir(parents=True, exist_ok=True)
+    folder = root / uuid.uuid4().hex;folder.mkdir()
+    report = {'format': 3, 'pilot_version': 3, 'kind': 'warehouse-input-probe-NOT-query-export',
+              'phase': 'prepared', 'warehouse': warehouse, 'started_at': now(),
+              'query_sent': False, 'export_sent': False, 'registered_in_sunil': False,
+              'warehouse_name_verified': False}
+    save_json(folder / 'input-probe.json', report)
+    try:
+        progress(f'{delay}초 안에 Actas로 돌아가 창고 코드 칸을 클릭한 뒤 손을 떼세요.')
+        time.sleep(delay)
+        adapter.preflight()
+        report.update(phase='input_only')
+        save_json(folder / 'input-probe.json', report)
+        report['evidence'] = adapter.enter_warehouse(warehouse, already_selected=True)
+        report.update(phase='input_keys_checked_operator_review_required', completed_at=now())
+        save_json(folder / 'input-probe.json', report)
+        return folder, report
+    except Exception as error:
+        report.update(phase='failed', failure_type=type(error).__name__, failure_message=str(error))
+        save_json(folder / 'input-probe.json', report)
+        progress('입력 검증 기록: ' + str(folder / 'input-probe.json'))
+        raise
+
+
 def main():
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, 'reconfigure'):stream.reconfigure(encoding='utf-8', errors='replace')
-    parser = argparse.ArgumentParser(description='Actas Y02·Y09 추출 검증 · SUNIL 등록 없음')
+    parser = argparse.ArgumentParser(description='Actas 창고 입력 확정만 검증 · 조회/추출/등록 없음')
     parser.add_argument('--output-root', type=Path, default=Path(__file__).resolve().parent / 'runs')
+    parser.add_argument('--probe-warehouse', choices=('Y02', 'Y09'))
     args = parser.parse_args()
-    print('Actas 현재고 현황에서 검색·분류 조건을 전체로 하고 창고 코드 칸을 선택해 두세요.')
-    print('다른 사람이 Actas를 조작하지 않도록 하고, 실행 중 마우스·키보드는 확인 단계에서만 사용하세요.')
-    if not confirm_token('START', '준비됐다면 START 또는 start를 입력하세요. 취소하려면 Enter: '):return 1
-    def confirm(warehouse):
-        print(f'Actas에서 창고 코드 {warehouse}가 유지되고 해당 창고의 조회 표가 갱신됐는지 직접 확인하세요.')
-        print('확인 후 이 PowerShell로 돌아오세요. 아직 갱신 중이면 기다리세요.')
-        return confirm_token(warehouse, f'완료를 확인했다면 {warehouse}를 입력, 중단하려면 Enter: ')
+    if not args.probe_warehouse:
+        print('일괄 조회/추출은 중지된 검증본입니다. --probe-warehouse Y09로 입력 확정부터 확인하세요.')
+        return 1
+    print('이번에는 창고 코드 입력만 합니다. 조회·Excel 저장·SUNIL ERP 등록은 하지 않습니다.')
+    print('Actas 저장창을 닫고 현재고 현황을 열어 두세요.')
+    if not confirm_token('START', '준비되면 start를 입력하세요. 취소하려면 Enter: '):return 1
     try:
         with single_pilot():
-            folder, report = run_check(WindowsActas(), args.output_root, confirm)
-        print('두 파일 저장·원본 형식 확인 완료. 소수·음수·공란을 그대로 보존했습니다.')
-        print('SUNIL ERP 등록·실제 재고 변경은 하지 않았습니다.')
-        print('결과 파일:', folder / 'result.json')
+            folder, report = probe_input(WindowsActas(), args.output_root, args.probe_warehouse)
+        print('키 입력 확인이 끝났습니다. 창고 코드와 오른쪽 창고명을 직접 확인해 주세요.')
+        print('조회·파일 추출·SUNIL ERP 등록은 실행하지 않았습니다.')
+        print('결과 파일:', folder / 'input-probe.json')
         return 0
     except Exception as error:
-        print('검증 중단:', str(error))
-        print('Actas의 실제 상태를 확인하고 기록 파일을 전달하세요. 자동 재시도하지 않습니다.')
+        print('입력 검증 중단:', str(error))
+        print('오류 화면과 입력 검증 기록을 전달하세요. 반복 실행하지 마세요.')
         return 1
 
 

@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 import uuid
+from types import SimpleNamespace
 from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('pilot', Path(__file__).with_name('actas_export_check.py'))
@@ -30,6 +31,33 @@ class Fixture:
         path.write_bytes(data('SAME' if self.same else self.warehouse, -2 if self.warehouse=='Y02' and not self.same else 3))
 
 
+class EditBufferFixture(p.WindowsActas):
+    """Regression: visual text can differ from the committed DataWindow value."""
+    def __init__(self):
+        self.main,self.stock,self.conditions,self.editor=1,2,3,4
+        self.buffer=self.committed='Y02';self.stage='warehouse';self.keys=[]
+        self.u=SimpleNamespace(IsWindowVisible=lambda h:True, GetForegroundWindow=lambda:1,
+                               GetWindowLongW=lambda h,i:0, IsChild=lambda parent,child:parent==3 and child in (4,5))
+    def guard(self):pass
+    def preflight(self):pass
+    def child(self,parent,cls,identity,**kwargs):return {200:2,1002:3,10:4}[identity]
+    def text(self,h,**kwargs):return '현재고 현황'
+    def read_edit(self,h):return self.buffer
+    def focus_state(self):return (4,(0,0,10,10),True) if self.stage=='warehouse' else (5,(20,0,30,10),True)
+    def set_edit(self,h,value):raise AssertionError('WM_SETTEXT must not be used for a warehouse')
+    def message(self,h,code,*args,**kwargs):
+        if code!=0xB1:raise AssertionError('only text selection message is expected')
+    def key_events(self,events,**kwargs):
+        self.keys.append(events)
+        if events[0][0]==8:self.buffer=''
+        elif events[0][0]==0:
+            self.buffer+=''.join(chr(scan) for vk,scan,flags in events if flags==6)
+        elif events[0][0]==9:
+            self.committed=self.buffer;self.stage='next'
+        elif events[0][0]==0x10:self.stage='warehouse'
+    def shortcut(self,purpose):raise AssertionError('query/export must not run in input-only probe')
+
+
 class PilotTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.root=Path(self.temp.name)
@@ -44,7 +72,7 @@ class PilotTests(unittest.TestCase):
         run,report=self.run_pilot(adapter,confirm)
         self.assertEqual(adapter.events,['preflight','query-Y02','confirm-Y02','export-Y02','query-Y09','confirm-Y09','export-Y09'])
         self.assertFalse(report['registered_in_sunil']);self.assertFalse(report['automatic_query_completion_verified'])
-        self.assertEqual(report['phase'],'exports_validated')
+        self.assertEqual(report['phase'],'export_files_checked')
         self.assertEqual(report['files']['Y02']['quantity'],-2)
         self.assertEqual(set(x.name for x in run.iterdir()),{'Y02.xls','Y09.xls','result.json'})
     def test_operator_cancel_never_saves_or_queries_next_warehouse(self):
@@ -63,6 +91,36 @@ class PilotTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):self.run_pilot(Fixture(same=True))
         report=json.loads(next(self.root.glob('*/result.json')).read_text(encoding='utf-8'))
         self.assertEqual(report['phase'],'failed')
+    def test_same_catalog_with_live_quantity_changes_cannot_prove_switch(self):
+        adapter=Fixture()
+        def save(path):path.write_bytes(data('SAME-CODE',2 if adapter.warehouse=='Y02' else 3))
+        adapter.save_export=save
+        with self.assertRaisesRegex(RuntimeError,'품목 구성'):self.run_pilot(adapter)
+        report=json.loads(next(self.root.glob('*/result.json')).read_text(encoding='utf-8'))
+        self.assertEqual(report['phase'],'failed')
+        self.assertFalse(report['warehouse_transition_verified'])
+    def test_keyboard_and_tab_commits_model_instead_of_only_visual_text(self):
+        adapter=EditBufferFixture()
+        evidence=adapter.enter_warehouse('Y09',already_selected=True)
+        self.assertEqual(adapter.committed,'Y09')
+        self.assertEqual(adapter.buffer,'Y09')
+        self.assertTrue(evidence['tab_transition_observed'])
+        self.assertFalse(evidence['query_sent']);self.assertFalse(evidence['warehouse_name_verified'])
+    def test_probe_never_queries_or_exports_and_keeps_operator_review_pending(self):
+        adapter=EditBufferFixture()
+        folder,report=p.probe_input(adapter,self.root,'Y09',delay=0,progress=lambda text:None)
+        self.assertEqual(adapter.committed,'Y09')
+        self.assertFalse(report['query_sent']);self.assertFalse(report['export_sent'])
+        self.assertFalse(report['registered_in_sunil']);self.assertFalse(report['warehouse_name_verified'])
+        self.assertEqual({f.name for f in folder.iterdir()},{'input-probe.json'})
+    def test_probe_with_wrong_focus_stops_before_any_key_event(self):
+        adapter=EditBufferFixture();adapter.stage='next'
+        with self.assertRaises(RuntimeError):p.probe_input(adapter,self.root,'Y09',delay=0,progress=lambda text:None)
+        self.assertEqual(adapter.keys,[]);self.assertEqual(adapter.committed,'Y02')
+    def test_batch_entry_point_is_disabled_before_any_ui_access(self):
+        with patch('sys.argv',['actas_export_check.py']),patch('builtins.print'),patch.object(p,'WindowsActas') as factory:
+            self.assertEqual(p.main(),1)
+            factory.assert_not_called()
     def test_duplicate_codes_bad_quantities_and_wrong_format_rejected(self):
         for raw in (b'partial', data()+data().split(b'\r\n',1)[1],data(quantity='NaN'),data(quantity='1e-999999')):
             with self.subTest(raw=raw),self.assertRaises(RuntimeError):p.inspect_export(raw)
@@ -104,7 +162,7 @@ class PilotTests(unittest.TestCase):
             if adapter.warehouse=='Y02':path.write_bytes(data('Y02','1.5'))
         adapter.save_export=fractional
         run,report=self.run_pilot(adapter)
-        self.assertEqual(report['phase'],'exports_validated')
+        self.assertEqual(report['phase'],'export_files_checked')
         self.assertEqual(set(report['files']),{'Y02','Y09'})
         self.assertFalse(report['registered_in_sunil'])
     def test_confirmation_ignores_case_and_reprompts_wrong_warehouse(self):
@@ -168,6 +226,8 @@ class PilotTests(unittest.TestCase):
             self.assertTrue(root and stock and conditions and editor and grid_editor)
             with patch.object(adapter,'desktop',return_value=None):adapter.preflight()
             self.assertEqual(adapter.editor,editor)
+            focus,rect,visible=adapter.focus_state()
+            self.assertEqual(len(rect),4);self.assertTrue(visible)
             adapter.set_edit(adapter.editor,'Y02');self.assertEqual(adapter.read_edit(editor),'Y02')
             self.assertEqual(adapter.read_edit(grid_editor),'DO-NOT-CHANGE')
         finally:
