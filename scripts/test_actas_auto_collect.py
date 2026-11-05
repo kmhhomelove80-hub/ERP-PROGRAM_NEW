@@ -1,4 +1,5 @@
 import json
+import struct
 from pathlib import Path
 import tempfile
 import unittest
@@ -25,6 +26,17 @@ class Clock:
 
 
 class AutoTests(unittest.TestCase):
+    def test_filter_digest_ignores_warehouse_but_detects_search_category_and_checkbox_changes(self):
+        width,height=1271,53
+        header=struct.pack('<2sIHHI',b'BM',54+width*height*4,0,0,54)+struct.pack('<IiiHHIIiiII',40,width,-height,1,32,0,width*height*4,0,0,0,0)
+        original=header+b'\xff'*(width*height*4)
+        baseline=auto.filter_signature(original)
+        def changed(x,y):
+            value=bytearray(original);index=54+(y*width+x)*4;value[index:index+3]=b'\x00'*3;return value
+        self.assertEqual(auto.filter_signature(changed(120,12)),baseline)
+        self.assertEqual(auto.filter_signature(changed(220,12)),baseline)
+        for x,y in ((500,12),(120,35),(280,35)):
+            self.assertNotEqual(auto.filter_signature(changed(x,y)),baseline)
     def test_exact_name_anchors_allow_only_the_code_gap(self):
         for name,code in [('부산창고','Y09'),('영주제품창고','Y02'),('영주자재창고','Y01')]:
             anchor=auto.warehouse_anchor(ocr(name))

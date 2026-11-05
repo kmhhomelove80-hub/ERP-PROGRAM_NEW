@@ -5,9 +5,11 @@ match exactly. Both busy signals must be observed after EACH query, followed
 by sustained readiness. Timeout does not mean success. No DB/secret access.
 """
 import argparse
+import hashlib
 import math
 from pathlib import Path
 import sys
+import struct
 import tempfile
 import time
 
@@ -15,6 +17,26 @@ import actas_export_check as pilot
 from actas_query_probe import NativeSampler, capture_client, recognize_conditions
 
 NAMES = {'Y01': '영주자재창고', 'Y02': '영주제품창고', 'Y09': '부산창고'}
+# Visually reviewed empty-filter capture from this installation. Only a digest
+# is embedded; the private image is not shipped. A changed UI requires review.
+FILTER_DIGEST = '5371640e076ab5c70a51f979e4a2b441ef965463aeb7302c50c6b806d8432e61'
+
+
+def filter_signature(bitmap):
+    if len(bitmap)<54 or bitmap[:2]!=b'BM':raise RuntimeError('검색 조건 화면을 읽지 못했습니다.')
+    width,height=struct.unpack_from('<ii',bitmap,18)
+    planes,bits,compression=struct.unpack_from('<HHI',bitmap,26)
+    offset=struct.unpack_from('<I',bitmap,10)[0]
+    if (width,height,planes,bits,compression)!=(1271,-53,1,32,0) or len(bitmap)!=offset+1271*53*4:
+        raise RuntimeError('검색 조건 화면 크기나 형식이 검증 기준과 다릅니다. 자동으로 기준을 바꾸지 않습니다.')
+    pixels=bytearray(bitmap[offset:]);pixels[3::4]=b'\xff'*(width*(-height))
+    digest=hashlib.sha256(struct.pack('<II',width,-height))
+    for y in range(-height):
+        # Warehouse code/name vary in the first 300 columns of the top row.
+        # Everything else, including search, categories and checks, must match.
+        start=300 if y<24 else 0
+        digest.update(pixels[(y*width+start)*4:(y+1)*width*4])
+    return digest.hexdigest()
 
 
 def compact(text):return ''.join(str(text).split())
@@ -134,6 +156,13 @@ class AutomaticAdapter:
         a.wait_input(focused_editor, '창고 코드 칸의 포커스를 확인하지 못했습니다.')
         if a.read_edit(a.editor).strip()!=anchor['code']:
             raise RuntimeError('클릭한 입력란의 실제 코드와 창고명 판독 결과가 다릅니다. 입력하지 않습니다.')
+    def verify_filters(self, warehouse):
+        self.a.guard()
+        if self.a.u.GetForegroundWindow()!=self.a.main:raise RuntimeError('검색 조건 확인 전에 화면이 변경됐습니다.')
+        observed=filter_signature(capture_client(self.a,self.a.conditions))
+        self.log('filter_check',warehouse=warehouse,observed=observed,verified=observed==FILTER_DIGEST)
+        if observed!=FILTER_DIGEST:
+            raise RuntimeError('검색·분류 화면이 검증 기준과 달라 전체 조건을 확인하지 못했습니다. 자동 저장하지 않습니다.')
     def select_and_query(self, warehouse):
         self.a.preflight();self.a.activate(self.a.stock,self.a.main)
         # Bind all APIs before pointer use. NativeSampler captures no external UI.
@@ -148,6 +177,7 @@ class AutomaticAdapter:
             if time.monotonic()>deadline:raise RuntimeError('입력 후 창고명이 요청 창고로 바뀌지 않았습니다.')
             time.sleep(.2)
         self.log('warehouse_name_verified', warehouse=warehouse, name=observed['name'])
+        self.verify_filters(warehouse)
         wait_ready(sampler.sample, timeout=12, busy_required=False)
         # No foreground changes or blind sleep between readiness and query.
         self.a.query_committed(warehouse)
@@ -160,6 +190,7 @@ class AutomaticAdapter:
         signal=wait_ready(sampler.sample, timeout=self.timeout,event=trace)
         if self.a.read_edit(self.a.editor).strip()!=warehouse or self.read_name()['code']!=warehouse:
             raise RuntimeError('조회 후 창고 코드·명칭이 변경됐습니다. 저장하지 않습니다.')
+        self.verify_filters(warehouse)
         self.log('query_signals_observed', warehouse=warehouse, evidence=signal)
         evidence.update(query_sent=True, warehouse_name_verified_by='local_ocr_exact', query_observation=signal)
         return evidence
