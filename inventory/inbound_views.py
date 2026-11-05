@@ -10,7 +10,10 @@ from .models import Stock
 @menu_access('receiving')
 @require_GET
 def inbound_list(request):
- return render(request,'inventory/inbound_list.html')
+ from django.core import signing
+ from uuid import uuid4
+ nonce=signing.dumps({'actor':request.user.pk,'id':str(uuid4())},salt='inbound-receipt-page')
+ return render(request,'inventory/inbound_list.html',{'inbound_nonce':nonce})
 
 @menu_access('receiving',write=True)
 @require_POST
@@ -30,3 +33,31 @@ def inbound_locations(request):
  response=JsonResponse({'locations':result,'warehouse':'Y09','basis':'입고 완료 현재고가 많은 위치 순'})
  response['Cache-Control']='no-store'
  return response
+
+
+def receipt_handoff(data,actor):
+ """Validate the five columns, bound to this user and source-screen operation."""
+ from django.core import signing
+ from django.core.exceptions import ValidationError
+ from uuid import UUID,uuid5
+ from .bulk_receipts import parse_receipts
+ try:
+  nonce=signing.loads(data.get('inbound_nonce',''),salt='inbound-receipt-page',max_age=86400)
+  if nonce['actor']!=actor.pk:raise ValueError
+  revision=int(data.get('inbound_revision',''))
+  if not 1<=revision<=1000000:raise ValueError
+  raw=data.get('inbound_rows','')
+  if len(raw)>500000:raise ValueError
+  rows=json.loads(raw)
+  if not isinstance(rows,list) or not 1<=len(rows)<=1000:raise ValueError
+  normalized=[]
+  for row in rows:
+   if not isinstance(row,list) or len(row)!=5:raise ValueError
+   if any(not isinstance(v,str) for v in (row[0],row[1],row[2],row[4])):raise ValueError
+   if isinstance(row[3],bool) or not isinstance(row[3],(str,int,float)):raise ValueError
+   normalized.append([' '.join(str(v).replace('\t',' ').splitlines()).strip() for v in row])
+  parsed=parse_receipts(pasted='\n'.join('\t'.join(row) for row in normalized))
+  request_id=uuid5(UUID(nonce['id']),str(revision))
+ except (signing.BadSignature,ValueError,KeyError,TypeError):
+  raise ValidationError('입고 전달 자료가 만료되었거나 올바르지 않습니다. 입고 LIST에서 다시 보내세요.')
+ return {'actor':actor.pk,'request_id':str(request_id),'rows':parsed},'\r\n'.join('\t'.join(row) for row in normalized)

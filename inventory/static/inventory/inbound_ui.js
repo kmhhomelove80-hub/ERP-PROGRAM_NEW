@@ -8,7 +8,7 @@ $('date').value=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
 const title=()=>$('date').value.replaceAll('-','. ')+'. 입고 LIST';
 function tab(preview){$('editor').hidden=preview;$('preview').hidden=!preview;$('editTab').classList.toggle('active',!preview);$('previewTab').classList.toggle('active',preview);}
 function editor(){
- $('editBody').innerHTML=rows.map((r,i)=>`<tr><td class="selectCol"><input type="checkbox" class="rowSelect" data-group="${i}" aria-label="${esc(r.code)} 원본 선택"></td><td><b>${esc(r.code)}</b><div>${esc(r.name)}</div><small>${esc(r.spec)}</small></td><td><small>${esc(r.date)} · ${esc(r.from)} → ${esc(r.to)}<br>ERP 적요: ${esc(r.note)}<br>ERP 비고: ${esc(r.erpRemark)}${r.helper?'<br>RAW 비고: '+esc(r.helper):''}</small></td><td class="num">${fmt(r.qty)}</td><td><input class="split" aria-label="${esc(r.code)} 분할 수량" data-i="${i}" data-key="split" value="${esc(r.split)}" placeholder="예: 32+32"></td><td><input class="remark" aria-label="${esc(r.code)} 기본 최종 비고" data-i="${i}" data-key="remark" value="${esc(r.remark)}" placeholder="위치 / 메모"></td></tr>`).join('');
+ $('editBody').innerHTML=rows.map((r,i)=>`<tr><td class="selectCol"><input type="checkbox" class="rowSelect" data-group="${i}" aria-label="${esc(r.code)} 원본 선택"></td><td><b>${esc(r.code)}</b><div>${esc(r.name)}</div><small>${esc(r.spec)}</small></td><td><small>${esc(r.date)} · ${esc(r.from)} → ${esc(r.to)}<br>ERP 적요: ${esc(r.note)}<br>ERP 비고: ${esc(r.erpRemark)}${r.helper?'<br>RAW 비고: '+esc(r.helper):''}</small></td><td class="num">${fmt(r.qty)}</td><td><input class="split" aria-label="${esc(r.code)} 분할 수량" data-i="${i}" data-key="split" value="${esc(r.split)}" placeholder="예: 32+32"></td><td><input class="remark" aria-label="${esc(r.code)} 기본 최종 비고" data-i="${i}" data-key="remark" value="${esc(r.remark)}" placeholder="로케이션"></td></tr>`).join('');
  $('selectAllEdit').checked=false;
 }
 function update(){
@@ -16,7 +16,7 @@ function update(){
  if(!$('date').value)errors.push('문서 날짜를 선택하세요.');
  let out=[];if(!errors.length)try{out=Inbound.output(rows);}catch(e){errors.push(e.message);}
  invalid=!!errors.length||!out.length;root.dataset.invalid=String(invalid);
- for(const id of ['copyERP','download','print'])$(id).disabled=invalid;
+ for(const id of ['copyERP','download','print','receive'])$(id).disabled=invalid;
  $('msg').textContent=errors.join('\n');
  root.querySelectorAll('.split').forEach(e=>{try{Inbound.parts(rows[+e.dataset.i]);e.classList.remove('bad');e.removeAttribute('aria-invalid');}catch{e.classList.add('bad');e.setAttribute('aria-invalid','true');}});
  $('itemCount').textContent=new Set(out.map(r=>r.code)).size;$('rowCount').textContent=out.length;$('totalQty').textContent=errors.length?'—':fmt(Inbound.sum(out.map(r=>r.qty)));
@@ -89,6 +89,20 @@ function legacyCopy(data){
  try{ok=document.execCommand('copy');}finally{document.removeEventListener('copy',handler);ta.remove();}
  if(!ok)throw Error('브라우저에서 복사를 허용하지 않습니다. 엑셀을 내려받아 셀을 복사하세요.');
 }
+$('receive').onclick=()=>{
+ update();if(invalid)return;
+ try{
+  const cells=Inbound.erpCells(rows);
+  if(cells.length>1000)throw Error('입고 화면으로는 한 번에 1,000행까지 보낼 수 있습니다.');
+  if(cells.some(r=>!String(r[4]??'').trim()))throw Error('모든 행의 최종 비고에 로케이션을 입력하세요.');
+  if(cells.some(r=>!Number.isSafeInteger(r[3])||r[3]<=0||r[3]>2147483647))throw Error('선일 ERP 입고 수량은 1 이상의 정수여야 합니다. 소수 수량은 확인 후 수정하세요.');
+  const form=document.createElement('form');form.method='post';form.action=root.dataset.receiveUrl;
+  const fields={action:'handoff',inbound_nonce:root.dataset.receiveNonce,inbound_revision:String(revision),inbound_rows:JSON.stringify(cells),csrfmiddlewaretoken:root.querySelector('[name=csrfmiddlewaretoken]').value};
+  for(const [key,value] of Object.entries(fields)){const input=document.createElement('input');input.type='hidden';input.name=key;input.value=value;form.append(input);}
+  $('receive').disabled=true;$('copyStatus').textContent='입고 화면으로 전달 중입니다. 아직 재고는 변경하지 않습니다.';document.body.append(form);form.requestSubmit();
+ }catch(e){$('copyStatus').textContent='입고 전달 중단: '+e.message;}
+};
+window.addEventListener('pageshow',()=>{$('receive').disabled=invalid;});
 $('copyERP').onclick=async()=>{
  update();if(invalid)return;
  try{const data=Inbound.clipboard(rows);try{

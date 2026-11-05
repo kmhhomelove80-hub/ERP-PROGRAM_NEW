@@ -64,6 +64,7 @@ jobs:
       - run: python -m pip install -r requirements.txt playwright==1.62.0 pymupdf==1.26.7
       - run: python scripts/fetch_inbound_vendor.py
       - run: python scripts/smoke_stocktake.py
+      - run: python scripts/smoke_inbound_handoff.py
       - run: python scripts/smoke_inbound.py
       - run: python scripts/smoke_production.py
       - run: python scripts/smoke_menu_permissions.py

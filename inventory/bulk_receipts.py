@@ -38,9 +38,11 @@ def receive_batch(*, request_id, rows, actor):
     if prior:
         if prior.actor_id != actor.pk or prior.detail.get('rows') != normalized:
             raise ValidationError('이미 사용한 요청번호입니다.')
-        return
+        return False
     for i, row in enumerate(normalized):
         item, _ = Item.objects.get_or_create(code=row['code'], defaults={'name':row['name'], 'specification':row['specification']})
         receive_stock(item_id=item.pk, location=row['location'], quantity=row['quantity'], status=Stock.Status.RECEIVED,
                       expected_date=None, sender='', request_id=uuid.uuid5(request_id, str(i)), actor=actor)
     audit(actor, 'receipt_batch', request_id, rows=normalized, count=len(normalized), quantity=sum(r['quantity'] for r in normalized))
+
+    return True

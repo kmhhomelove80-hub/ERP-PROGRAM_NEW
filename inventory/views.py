@@ -516,16 +516,22 @@ def receipt_bulk(request):
     from .bulk_receipts import receive_batch
     form=BulkReceiptForm(request.POST if request.POST.get('action')=='preview' else None,request.FILES or None)
     preview, confirm_form = None, None
-    if request.method=='POST' and request.POST.get('action')=='preview' and form.is_valid():
+    if request.method=='POST' and request.POST.get('action')=='handoff':
+        from .inbound_views import receipt_handoff
+        try:
+            payload,text=receipt_handoff(request.POST,request.user)
+            from uuid import UUID
+            form=BulkReceiptForm(initial={'request_id':UUID(payload['request_id']),'pasted_rows':text})
+            preview=payload['rows']
+            confirm_form=ErpConfirmForm(initial={'preview_token':signing.dumps(payload,salt='receipt-batch',compress=True)})
+            confirm_form.fields['confirmed'].label='5개 항목과 행별 수량·로케이션을 확인했으며 실제 입고를 진행합니다.'
+        except ValidationError as error:
+            form=BulkReceiptForm({})
+            form.is_valid()
+            form.add_error(None,error)
+    elif request.method=='POST' and request.POST.get('action')=='preview' and form.is_valid():
         d=form.cleaned_data
         preview=d['rows']
-        from .models import Item
-        existing={i.code:i for i in Item.objects.filter(code__in=[r['code'] for r in preview])}
-        warnings=[]
-        for r in preview:
-            item=existing.get(r['code'])
-            if item and (item.name!=r['name'] or item.specification!=r['specification']):
-                warnings.append(r['code'])
         payload=dict(actor=request.user.pk,request_id=str(d['request_id']),rows=preview)
         confirm_form=ErpConfirmForm(initial={'preview_token':signing.dumps(payload,salt='receipt-batch',compress=True)})
         confirm_form.fields['confirmed'].label='행별 수량·Location과 기존 품목 설명 유지 안내를 확인했습니다.'
@@ -536,12 +542,17 @@ def receipt_bulk(request):
                 from uuid import UUID
                 payload=signing.loads(confirm_form.cleaned_data['preview_token'],salt='receipt-batch',max_age=1800)
                 if payload['actor']!=request.user.pk: raise ValidationError('다른 사용자의 미리보기입니다.')
-                receive_batch(request_id=UUID(payload['request_id']),rows=payload['rows'],actor=request.user)
+                created=receive_batch(request_id=UUID(payload['request_id']),rows=payload['rows'],actor=request.user)
             except (signing.BadSignature,ValidationError) as error:
                 confirm_form.add_error(None,error if isinstance(error,ValidationError) else '미리보기가 만료되었거나 유효하지 않습니다.')
             else:
-                messages.success(request,f"{len(payload['rows'])}개 행을 일괄 입고했습니다.")
+                if created:messages.success(request,f"{len(payload['rows'])}개 행을 일괄 입고했습니다.")
+                else:messages.info(request,'이미 처리한 입고 요청입니다. 추가 입고하지 않았습니다.')
                 return redirect('receipt-list')
+    if preview:
+        from .models import Item
+        existing={item.code:item for item in Item.objects.filter(code__in=[r['code'] for r in preview])}
+        warnings=list(dict.fromkeys(r['code'] for r in preview if r['code'] in existing and (existing[r['code']].name!=r['name'] or existing[r['code']].specification!=r['specification'])))
     return render(request,'inventory/receipt_bulk.html',{'form':form,'preview':preview,'confirm_form':confirm_form,'warnings':locals().get('warnings',[])})
 
 
