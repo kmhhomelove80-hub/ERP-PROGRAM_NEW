@@ -29,7 +29,7 @@ class StockSortTests(TestCase):
         response = self.client.get('/', {'sort':'available','direction':'desc','q':'AAA'})
         self.assertEqual(response.context['page_obj'][0].quantity,150)
         self.assertEqual(response.context['page_obj'].paginator.count,52)
-        self.assertContains(response,'sort=available&amp;direction=desc&amp;page=2')
+        self.assertContains(response,'sort=available&amp;direction=desc&amp;model=&amp;spec=&amp;page=2')
         response = self.client.get('/', {'sort':'available','direction':'desc','q':'AAA','page':2})
         self.assertEqual(response.context['page_obj'][-1],self.a)
 

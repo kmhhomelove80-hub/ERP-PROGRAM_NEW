@@ -18,6 +18,7 @@ jobs:
       - run: python manage.py test --noinput
       - run: python scripts/check_laptop_upgrade.py
       - run: node scripts/test_delivery_receiver.cjs
+      - run: node scripts/test_inbound.cjs
       - run: python scripts/test_standard_update.py
       - run: python scripts/test_standard_update_windows.py
   postgresql18:
@@ -57,6 +58,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install -r requirements.txt playwright==1.62.0
+      - run: python -m pip install -r requirements.txt playwright==1.62.0 pymupdf==1.26.7
+      - run: python scripts/fetch_inbound_vendor.py
+      - run: python scripts/smoke_inbound.py
       - run: python scripts/smoke_production.py
       - run: python scripts/smoke_menu_permissions.py

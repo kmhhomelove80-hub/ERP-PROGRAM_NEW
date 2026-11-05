@@ -1,9 +1,11 @@
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import path
-from inventory import views, production_views
+from inventory import views, production_views, inbound_views
 from .auth_views import WarehouseLoginView
 urlpatterns = [
+    path('inbound/',inbound_views.inbound_list,name='inbound-list'),
+    path('inbound/locations/',inbound_views.inbound_locations,name='inbound-locations'),
     path('notifications/movements/',views.movement_notifications,name='movement-notifications'),
     path('production/',production_views.production_plan,name='production-plan'),
     path('production/settings/',production_views.production_settings,name='production-settings'),

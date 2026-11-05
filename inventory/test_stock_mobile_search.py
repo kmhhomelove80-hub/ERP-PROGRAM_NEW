@@ -25,7 +25,7 @@ class StockMobileSearchTests(TestCase):
 
     def test_rows_expand_with_full_details_and_correct_movement(self):
         response = self.client.get('/')
-        self.assertContains(response, '<details class="stock-row">', count=2)
+        self.assertContains(response, '<details class="stock-row" data-stock-id=', count=2)
         self.assertContains(response, '<summary aria-label=', count=2)
         self.assertContains(response, '24V')
         self.assertContains(response, f'/stock/{self.stock.pk}/move/', count=2)

@@ -17,3 +17,7 @@ laptop-data/
 laptop-real-data/
 
 *.xls
+
+work/
+runtime.local.json
+inventory/static/inventory/vendor/xlsx.full.min.js

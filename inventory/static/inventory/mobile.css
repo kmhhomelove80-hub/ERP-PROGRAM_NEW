@@ -11,7 +11,7 @@
   header form{margin:0}
   header button{min-height:44px;padding:8px 12px;font-size:14px}
   main{padding:12px max(12px,env(safe-area-inset-right)) 20px max(12px,env(safe-area-inset-left));min-width:0}
-  .signed-in main{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+  .signed-in main{padding-bottom:24px}
   h1{font-size:23px;line-height:1.25;margin:12px 0 16px;overflow-wrap:anywhere}
   main p,.card,.facts dd{overflow-wrap:anywhere}
   .entry,.card,.filters>*{min-width:0}
@@ -175,3 +175,5 @@
 .primary-nav .extension-nav{margin-left:auto;padding-left:18px;border-left:1px solid #53657b}.extension-nav>a{display:block;padding:10px 14px;border-radius:6px;background:#244768;white-space:nowrap}.movement-pending-notice{border-left:4px solid #b36b00;margin-bottom:14px}.movement-pending-notice a{color:#694300;font-weight:600}@media screen and (max-width:900px){.primary-nav .extension-nav{margin-left:auto;padding-left:12px}}@media screen and (max-width:600px){.primary-nav .extension-nav{grid-column:1/-1;display:flex;justify-content:flex-end;gap:6px;margin:4px 0 0;padding:8px 0 0;border-left:0;border-top:1px solid #53657b}.extension-nav>a{font-size:13px;padding:8px 12px}}
 
 @media screen and (max-width:600px){.primary-nav details:first-of-type .nav-panel{left:auto;right:0}}
+
+@media screen and (min-width:601px){.primary-nav .extension-nav{display:flex;gap:8px;align-items:center}}

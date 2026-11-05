@@ -56,7 +56,7 @@ print(json.dumps({'worker':worker.pk,'stock':s.pk}))'''
             expect(owner.locator('#movement-pending-notice')).to_be_hidden()
             assert worker.locator('#movement-pending-notice').count()==0
             nav=owner.locator('.primary-nav')
-            assert nav.locator('> .extension-nav > a').inner_text()=='생산계획조회'
+            assert nav.locator('> .extension-nav > a').all_inner_texts()==['생산계획조회','입고 LIST']
             last_menu=nav.locator('> details').last.bounding_box();extra=nav.locator('> .extension-nav').bounding_box()
             assert extra['x']>last_menu['x']+last_menu['width']
             worker.goto(base+f'/stock/{ids["stock"]}/move/')

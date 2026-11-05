@@ -4,7 +4,10 @@
   const status = document.querySelector('#selection-status');
   let anchor = null;
   function update() {
-    const count = boxes.filter(b => b.checked).length;
+    const chosen = boxes.filter(b => b.checked);
+    const count = chosen.length;
+    const filtered = document.querySelector('input[name=scope]:checked')?.value === 'filtered';
+    document.querySelector('#processing-quantity').textContent = Number(filtered ? document.querySelector('#filtered-quantity').dataset.quantity : chosen.reduce((sum,b) => sum + Number(b.dataset.quantity),0)).toLocaleString('ko-KR');
     all.checked = boxes.length > 0 && count === boxes.length;
     all.indeterminate = count > 0 && count < boxes.length;
     status.textContent = `현재 페이지 ${count}행 선택`;
@@ -18,5 +21,6 @@
     update();
   }));
   all.addEventListener('change', () => {boxes.forEach(b => b.checked = all.checked); anchor = null; update();});
+  document.querySelectorAll('input[name=scope]').forEach(b => b.addEventListener('change',update));
   update();
 })();

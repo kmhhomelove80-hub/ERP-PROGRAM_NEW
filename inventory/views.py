@@ -210,7 +210,7 @@ def allocation_list(request):
     ids=list(versions)
     token=signing.dumps(dict(actor=request.user.pk,q=query,seq=seq,ids=ids,versions=versions),salt='allocation-filter',compress=True)
     page=Paginator(rows,50).get_page(request.GET.get('page'))
-    return render(request,'inventory/allocations.html',{'form':form,'allocations':page,'page_obj':page,'query':query,'seq':seq,'total':len(ids),'filter_token':token,'selected_ids':request.POST.getlist('allocations')})
+    return render(request,'inventory/allocations.html',{'form':form,'allocations':page,'page_obj':page,'query':query,'seq':seq,'total':len(ids),'filtered_quantity':sum(v[1] for v in versions.values()),'filter_token':token,'selected_ids':request.POST.getlist('allocations')})
 
 @login_required
 def movement_create(request, pk):

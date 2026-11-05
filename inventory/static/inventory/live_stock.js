@@ -3,9 +3,53 @@
   if (!form) return;
   const results = document.querySelector(form.dataset.results || '#stock-results');
   const status = document.querySelector(form.dataset.status || '#stock-search-status');
-  let timer, controller, serial = 0;
+  let timer, controller, serial = 0, moreController, moreBusy=false;
+  const observer = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
+    if (entries.some(e => e.isIntersecting)) loadMore();
+  }, {rootMargin:'300px'}) : null;
+  function watchMore() {
+    observer?.disconnect();
+    const link=results.querySelector('[data-load-more]');
+    if(link) observer?.observe(link);
+  }
+  function cancelMore() { moreController?.abort(); moreController=null; moreBusy=false; observer?.disconnect(); }
+  async function loadMore() {
+    const link=results.querySelector('[data-load-more]');
+    if(!link || moreBusy) return;
+    const version=serial;
+    moreBusy=true; moreController=new AbortController();
+    const endpoint=new URL(link.href); endpoint.searchParams.set('partial','1');
+    link.textContent='불러오는 중…';
+    try {
+      const response=await fetch(endpoint,{signal:moreController.signal});
+      if(!response.ok || response.redirected) throw Error('request failed');
+      const html=await response.text(); if(version!==serial) return;
+      const next=new DOMParser().parseFromString(html,'text/html');
+      for(const selector of ['.desktop-stock-table tbody','.mobile-stock-cards']) {
+        const target=results.querySelector(selector);
+        const existing=new Set([...target.querySelectorAll('[data-stock-id]')].map(n=>n.dataset.stockId));
+        next.querySelectorAll(selector+' > [data-stock-id]').forEach(row=>{
+          if(!existing.has(row.dataset.stockId)) target.append(row);
+        });
+      }
+      results.querySelector('[data-stock-more]').replaceWith(next.querySelector('[data-stock-more]'));
+      status.textContent='추가 조회 완료';
+    } catch(error) {
+      if(error.name!=='AbortError' && version===serial) {
+        link.textContent='추가 조회 실패 · 눌러 다시 시도'; observer?.disconnect(); return;
+      }
+    } finally { if(version===serial) moreBusy=false; }
+    if(version===serial) watchMore();
+  }
+  results.addEventListener('click',event=>{
+    if(event.target.closest('[data-load-more]') && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) {
+      event.preventDefault(); event.stopImmediatePropagation(); loadMore();
+    }
+  });
+  watchMore();
   async function refresh(url) {
     clearTimeout(timer);
+    cancelMore();
     const version = ++serial;
     if (controller) controller.abort();
     controller = new AbortController();
@@ -19,6 +63,7 @@
       const html = await response.text();
       if (version !== serial) return;
       results.innerHTML = html;
+      watchMore();
       history.replaceState(null, '', url);
       const download = document.querySelector('#stock-export');
       if (download) download.search = new URL(url).search;
@@ -45,6 +90,7 @@
     status.textContent = '조회 대기…';
     // Invalidate and cancel in-flight work immediately, even during debounce.
     serial++;
+    cancelMore();
     if (controller) controller.abort();
     timer = setTimeout(() => refresh(url()), 300);
   }
