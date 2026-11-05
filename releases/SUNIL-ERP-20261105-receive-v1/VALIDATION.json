@@ -1,0 +1,45 @@
+{
+  "success": true,
+  "windows_native_success": true,
+  "windows_schedule_restore_success": true,
+  "postgresql18_success": true,
+  "browser_success": true,
+  "commit": "0138452053a44dede348b051f4d307b562f9257a",
+  "workflow_run": 42127076870,
+  "url": "https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/actions/runs/42127076870",
+  "jobs": [
+    {
+      "id": 127593873652,
+      "name": "browser",
+      "conclusion": "success"
+    },
+    {
+      "id": 127593873988,
+      "name": "postgresql18",
+      "conclusion": "success"
+    },
+    {
+      "id": 127593874029,
+      "name": "windows-python312",
+      "conclusion": "success"
+    }
+  ],
+  "source_payload_and_helpers_verified": 81,
+  "package_apply_restore_verified": [
+    "integrated-v3",
+    "bridge-v1",
+    "inbound-v1",
+    "stocktake-v1"
+  ],
+  "checks": [
+    "five_columns_including_specification",
+    "deleted_split_excluded",
+    "missing_location_and_fractional_quantity_rejected",
+    "no_stock_change_during_handoff",
+    "final_receipt_stock_mutation",
+    "same_job_duplicate_submit_blocked",
+    "existing_master_description_preserved",
+    "demo_data_transfer_blocked"
+  ],
+  "private_uploaded_files_in_release": false
+}
