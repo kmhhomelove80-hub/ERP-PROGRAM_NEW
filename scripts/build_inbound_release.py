@@ -11,18 +11,11 @@ def build(output,evidence_path):
  stage=ROOT/'work'/VERSION
  if stage.exists():shutil.rmtree(stage)
  (stage/'app').mkdir(parents=True)
- before={e['path']:e['sha256'] for e in json.loads((ROOT/'deploy/windows/delivery-bridge-v3/baseline.json').read_text())['files']}
- changed=subprocess.check_output(['git','diff','--name-only','eb57b40','HEAD'],cwd=ROOT,text=True).splitlines()
- names=set(before)|{n for n in changed if n.startswith(('inventory/','config/'))}
- names.add('inventory/static/inventory/vendor/xlsx.full.min.js')
+ baseline=json.loads((ROOT/'deploy/windows/inbound-v1/baseline.json').read_text())
  entries=[]
- for name in sorted(names):
-  data=(ROOT/name).read_bytes();target=stage/'app'/name;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(data)
-  old=set()
-  if before.get(name):old.add(before[name])
-  r=subprocess.run(['git','show','eb57b40:'+name],cwd=ROOT,capture_output=True)
-  if r.returncode==0:old.add(digest(r.stdout))
-  entries.append(dict(path=name,sha256=digest(data),accepted_previous_sha256=sorted(old),required_existing=bool(before.get(name)) or (name not in before and r.returncode==0)))
+ for previous in baseline['files']:
+  name=previous['path'];data=(ROOT/name).read_bytes();target=stage/'app'/name;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(data)
+  entries.append(dict(previous,sha256=digest(data)))
  helpers=('Update-Erp.py','release_updater.py','release_probe.py','update_snapshot.py')
  for name in helpers:shutil.copyfile(ROOT/('scripts/update_snapshot.py' if name=='update_snapshot.py' else 'deploy/windows/standard_update/'+name),stage/name)
  manifest=dict(format=3,release=VERSION,source_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),verified_ci_commit=evidence['commit'],target_migration='0013_employee_menu_access',files=entries,helpers={n:digest((stage/n).read_bytes()) for n in helpers})
