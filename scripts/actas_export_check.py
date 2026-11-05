@@ -195,7 +195,7 @@ def run_check(adapter, root, confirm, progress=print, reader=wait_file):
             evidence = adapter.select_and_query(warehouse)
             if evidence is not None:
                 report.setdefault('input_evidence', {})[warehouse] = evidence
-                report['pilot_version'] = 4
+                report['pilot_version'] = getattr(adapter, 'pilot_version', 4)
             report.update(phase='awaiting_operator_' + warehouse)
             save_json(run / 'result.json', report)
             if not confirm(warehouse):raise RuntimeError('담당자가 검증을 중단했습니다.')
@@ -463,10 +463,18 @@ class WindowsActas:
 
     def query_committed(self, warehouse):
         self.preflight()
-        self.activate(self.editor, self.main)
-        if self.focus_state()[0] != self.editor or self.read_edit(self.editor).strip() != warehouse:
-            raise RuntimeError('조회 직전 창고 코드가 달라 중단했습니다.')
+        self.guard()
+        if self.u.GetForegroundWindow() != self.main:
+            raise RuntimeError('조회 직전 Actas가 활성 화면이 아닙니다. 창고 코드 불일치가 아닙니다.')
+        focus, _, visible = self.focus_state()
+        if focus != self.editor or not visible:
+            raise RuntimeError('조회 직전 창고 코드 입력칸의 포커스를 확인하지 못했습니다. 코드 불일치로 판정한 것은 아닙니다.')
+        actual = self.read_edit(self.editor).strip()
+        if actual != warehouse:
+            shown = actual if re.fullmatch(r'Y\d{2}', actual) else '(창고 코드 형식 아님)'
+            raise RuntimeError(f'조회 직전 실제 코드 불일치: 요청 {warehouse}, 확인 {shown}. 조회하지 않았습니다.')
         self.shortcut('query')
+        return {'editor_readback': actual, 'focus_verified': True, 'query_sent': True}
 
     def save_export(self, path):
         self.activate(self.stock, self.main)
@@ -537,16 +545,18 @@ def probe_input(adapter, root, warehouse, *, delay=12, progress=print):
 
 class OperatorCheckedExport:
     """Require visual warehouse acceptance before query and again before export."""
-    pilot_version = 4
-    def __init__(self, adapter, prepare, accept_input):
+    pilot_version = 5
+    def __init__(self, adapter, prepare, accept_input, prepare_query):
         self.adapter, self.prepare, self.accept_input = adapter, prepare, accept_input
+        self.prepare_query = prepare_query
     def preflight(self):self.adapter.preflight()
     def select_and_query(self, warehouse):
         if not self.prepare(warehouse):raise RuntimeError('창고 선택 준비를 중단했습니다.')
         self.adapter.preflight()
         evidence = self.adapter.enter_warehouse(warehouse, already_selected=True)
         if not self.accept_input(warehouse):raise RuntimeError('창고 코드·명칭 확인을 중단했습니다. 조회하지 않았습니다.')
-        self.adapter.query_committed(warehouse)
+        self.prepare_query(warehouse)
+        evidence['query_check'] = self.adapter.query_committed(warehouse)
         evidence.update(query_sent=True, warehouse_name_confirmed_by='operator', input_confirmed_at=now())
         return evidence
     def save_export(self, path):self.adapter.save_export(path)
@@ -567,13 +577,17 @@ def export_main(root):
         name = '영주제품창고' if warehouse == 'Y02' else '부산창고'
         print(f'Actas 코드 {warehouse}와 오른쪽 창고명 {name}를 직접 확인하세요. 아직 조회하지 않았습니다.', flush=True)
         return confirm_token(warehouse + ' INPUT', f'일치하면 {warehouse} input, 중단은 Enter: ')
+    def prepare_query(warehouse):
+        print(f'{warehouse} 코드·창고명 확인을 기록했습니다.', flush=True)
+        print('12초 안에 Actas로 돌아가 같은 창고 코드 칸을 클릭하고 손을 떼세요. 그 뒤 도구가 조회합니다.', flush=True)
+        time.sleep(12)
     def accept_query(warehouse):
         print(f'Actas에서 {warehouse} 코드·창고명이 유지되고 재고 표가 새로 조회됐는지 확인하세요.', flush=True)
         print('아직 조회 중이거나 이전 표라면 확인을 입력하지 마세요. 확인 전에는 저장하지 않습니다.', flush=True)
         return confirm_token(warehouse, f'조회 완료 확인은 {warehouse}, 중단은 Enter: ')
     try:
         with single_pilot():
-            adapter = OperatorCheckedExport(WindowsActas(), prepare_export_input, accept_input)
+            adapter = OperatorCheckedExport(WindowsActas(), prepare_export_input, accept_input, prepare_query)
             folder, report = run_check(adapter, root, accept_query, progress=lambda message: print(message, flush=True))
         print('두 파일의 형식 검사가 끝났습니다. 창고/조회는 담당자가 확인했으며 자동 판독이 아닙니다.')
         print('SUNIL ERP에는 등록하지 않았습니다. result.json과 두 XLS 파일을 전달하세요.')
