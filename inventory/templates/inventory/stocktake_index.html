@@ -1,0 +1,6 @@
+{% extends 'inventory/base.html' %}{% load inventory_text %}{% block content %}
+<h1>재고실사 / 재고조정</h1><p class="notice">SUPER USER 전용 · 실사는 포장된 할당 자재를 제외한 로케이션 잔량을 조사합니다. 전산 출고는 완료하지 않아도 됩니다. 대상의 변경이 발생하면 새 회차로 다시 확인해야 합니다.</p>
+<p><a class="button" href="{% url 'stocktake-adjust' %}">개별 재고조정</a></p>
+<section class="card entry"><h2>조사 파일 만들기</h2><form method="post" data-stocktake-start>{% csrf_token %}{{ form.as_p }}<button>재고 실사 리스트 출력 / 다운로드 준비</button></form></section>
+<h2>최근 실사·조정 이력</h2><p>전체 기록 · 상세 화면에서 원본 파일과 변경 내역을 확인할 수 있습니다.</p><div class="table"><table><thead><tr><th>시작 시각</th><th>구분</th><th>대상</th><th>상태</th><th>작업자</th></tr></thead><tbody>{% for s in page_obj %}<tr data-record-id="{{ s.pk }}"><td><a href="{% url 'stocktake-detail' s.pk %}">{{ s.created_at|date:'Y-m-d H:i' }}</a></td><td>{% if s.kind == 'count' %}실사{% else %}조정{% endif %}</td><td>{{ s.query|default:'전체 Y09' }}</td><td>{{ s.state|stocktake_state }}</td><td>{{ s.actor }}</td></tr>{% empty %}<tr><td colspan="5">아직 기록이 없습니다.</td></tr>{% endfor %}</tbody></table></div>
+{% include 'inventory/scroll_page.html' %}{% endblock %}

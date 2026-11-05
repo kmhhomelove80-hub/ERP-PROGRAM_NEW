@@ -13,7 +13,7 @@
 </div>
 <div class="production-meta"><span id="plan-count" role="status" aria-live="polite"></span><small>{{ snapshot.filename }} · {{ snapshot.updated_at|date:'m/d H:i' }}</small></div>
 <div class="production-scroll" id="plan-scroll"><table id="plan-table"><colgroup></colgroup><thead><tr>{% for h in headers %}<th><button type="button" data-sort="{{ forloop.counter0 }}">{% if forloop.counter0 == 4 %}완료{% elif forloop.counter0 == 5 %}잔량{% else %}{{ h }}{% endif %}</button></th>{% endfor %}</tr></thead><tbody></tbody></table></div>
-<div class="production-pages no-print"><button id="plan-prev" type="button">이전</button><span id="plan-page"></span><button id="plan-next" type="button">다음</button></div>
+<div class="production-pages no-print"><span id="plan-page"></span><button id="plan-next" type="button">더 보기</button></div>
 <section id="production-capture" aria-label="선택한 행 상세 부품 정보">
 <h2>선택한 행 상세 · 부품 정보</h2>
 <div class="production-scroll" id="detail-scroll"><table id="plan-selected"><colgroup></colgroup><thead><tr>{% for h in headers %}<th>{% if forloop.counter0 == 4 %}완료{% elif forloop.counter0 == 5 %}잔량{% else %}{{ h }}{% endif %}</th>{% endfor %}</tr></thead><tbody></tbody></table></div>

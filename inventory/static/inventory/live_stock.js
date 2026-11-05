@@ -5,8 +5,14 @@
   const status = document.querySelector(form.dataset.status || '#stock-search-status');
   let timer, controller, serial = 0, moreController, moreBusy=false;
   const observer = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
-    if (entries.some(e => e.isIntersecting)) loadMore();
+    if (entries.some(e => e.isIntersecting)) maybeMore();
   }, {rootMargin:'300px'}) : null;
+  function maybeMore() {
+    const table=results.querySelector('.desktop-stock-table');
+    if(table?.offsetHeight && table.scrollHeight>table.clientHeight+20 && table.scrollTop+table.clientHeight<table.scrollHeight-200)return;
+    loadMore();
+  }
+  results.addEventListener('scroll',e=>{if(e.target.matches('.desktop-stock-table'))maybeMore();},true);
   function watchMore() {
     observer?.disconnect();
     const link=results.querySelector('[data-load-more]');

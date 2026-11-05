@@ -171,10 +171,26 @@ def allocation_list(request):
     from .services import release_selected, cancel_selected
     query=request.GET.get('q','').strip()
     seq=request.GET.get('seq','').strip()
-    rows=Allocation.objects.filter(state='reserved',substitution__isnull=True).select_related('stock__item','order').order_by('project','legacy_seq','stock__item__code','pk')
+    from django.db.models import Case,When,Value,CharField
+    from django.db.models.functions import Cast,Concat,Replace,TruncDate
+    from zoneinfo import ZoneInfo
+    recent_order=Concat(Replace(Cast(TruncDate('order__created_at',tzinfo=ZoneInfo('Asia/Seoul')),CharField()),Value('-'),Value('')),Value('999999'))
+    rows=(Allocation.objects.filter(state='reserved',substitution__isnull=True).select_related('stock__item','order')
+          .annotate(allocation_order_seq=Case(When(legacy_seq='',order__isnull=False,then=recent_order),default=F('legacy_seq'),output_field=CharField()))
+          .order_by('-allocation_order_seq','-order__created_at','-order_id','project','stock__item__code','stock__location','pk'))
     if query: rows=rows.filter(project__icontains=query)
     if seq: rows=rows.filter(Q(legacy_seq__icontains=seq)|Q(order__id__icontains=seq))
-    form=AllocationActionForm(request.POST or None)
+    selection_data=request.POST.copy() if request.method=='POST' else None
+    if selection_data is not None and 'selected_json' in selection_data:
+        import json
+        try:
+            chosen=json.loads(selection_data['selected_json'])
+            if not isinstance(chosen,list) or len(chosen)>20000 or any(not isinstance(v,str) or len(v)>40 for v in chosen):raise ValueError
+            selection_data.setlist('allocations',chosen)
+        except (ValueError,TypeError):
+            from django.http import HttpResponseBadRequest
+            return HttpResponseBadRequest('선택 자료를 확인하세요.')
+    form=AllocationActionForm(selection_data)
     form.fields['allocations'].queryset=rows
     if request.method=='POST' and form.is_valid():
         data=form.cleaned_data
@@ -209,8 +225,8 @@ def allocation_list(request):
     versions = {str(pk):[stock_id,quantity] for pk,stock_id,quantity in rows.values_list('pk','stock_id','quantity')}
     ids=list(versions)
     token=signing.dumps(dict(actor=request.user.pk,q=query,seq=seq,ids=ids,versions=versions),salt='allocation-filter',compress=True)
-    page=Paginator(rows,50).get_page(request.GET.get('page'))
-    return render(request,'inventory/allocations.html',{'form':form,'allocations':page,'page_obj':page,'query':query,'seq':seq,'total':len(ids),'filtered_quantity':sum(v[1] for v in versions.values()),'filter_token':token,'selected_ids':request.POST.getlist('allocations')})
+    page=Paginator(rows,max(1,len(ids)) if (query or seq) and len(ids)<=2000 else 50).get_page(1 if (query or seq) and len(ids)<=2000 else request.GET.get('page'))
+    return render(request,'inventory/allocations.html',{'form':form,'allocations':page,'page_obj':page,'query':query,'seq':seq,'total':len(ids),'filtered_quantity':sum(v[1] for v in versions.values()),'filter_token':token,'selected_ids':selection_data.getlist('allocations') if selection_data is not None else [],'all_visible':bool(query or seq) and len(ids)<=2000})
 
 @login_required
 def movement_create(request, pk):
@@ -713,11 +729,11 @@ def allocation_reassign(request, pk):
 
 @login_required
 def cleanup_list(request):
-    from .cleanup import cleanup_candidates
+    from .cleanup import reviewed_candidates
     from django.utils import timezone
     from .locking import warehouse_lock
     with warehouse_lock():
-        groups = cleanup_candidates(request.GET.get('q','').strip())
+        groups = reviewed_candidates(request.GET.get('q','').strip())
     return render(request,'inventory/cleanup.html',{'groups':groups,'generated_at':timezone.now(),'query':request.GET.get('q','').strip()})
 
 

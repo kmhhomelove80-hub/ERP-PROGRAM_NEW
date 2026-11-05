@@ -87,6 +87,7 @@ print(json.dumps({'worker':worker.pk,'stock':s.pk}))'''
             expect(worker.locator('main')).to_contain_text('완료')
             owner.goto(base+'/');expect(owner.locator('#movement-pending-notice')).to_be_hidden()
             worker.set_viewport_size({'width':390,'height':844});worker.goto(base+'/production/')
+            worker.locator('#mobile-menu-toggle').click()
             assert worker.locator('.extension-nav').is_visible()
             assert worker.evaluate('document.documentElement.scrollWidth<=innerWidth')
             worker.screenshot(path=str(ARTIFACTS/'production-section-mobile.png'),full_page=True)

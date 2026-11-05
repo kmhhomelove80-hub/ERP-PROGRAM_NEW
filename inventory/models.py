@@ -231,3 +231,36 @@ class EmployeeMenuAccess(models.Model):
     production = models.CharField('생산계획조회', max_length=4, choices=Level.choices, default=Level.READ)
     inventory = models.CharField('재고 관리', max_length=4, choices=Level.choices, default=Level.READ)
     management = models.CharField('관리', max_length=4, choices=Level.choices, default=Level.READ)
+
+class ItemRevision(models.Model):
+    item = models.OneToOneField(Item, primary_key=True, on_delete=models.CASCADE)
+    revision = models.PositiveBigIntegerField(default=0)
+
+class CleanupDecision(models.Model):
+    item = models.ForeignKey(Item, on_delete=models.PROTECT)
+    source = models.CharField(max_length=150)
+    destination = models.CharField(max_length=150)
+    fingerprint = models.CharField(max_length=64)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+    active = models.BooleanField(default=True)
+
+class StocktakeSession(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+    kind = models.CharField(max_length=12, default='count')
+    state = models.CharField(max_length=12, default='open')
+    query = models.CharField(max_length=250, blank=True)
+    snapshot = models.JSONField(default=dict)
+    proposal = models.JSONField(default=list)
+    upload_digest = models.CharField(max_length=64, blank=True)
+    source_file = models.BinaryField(null=True, blank=True)
+    source_name = models.CharField(max_length=255, blank=True)
+    preview_id = models.UUIDField(default=uuid.uuid4)
+    backup_path = models.TextField(blank=True)
+    applied_at = models.DateTimeField(null=True, blank=True)
+    result = models.JSONField(default=list)
+    after_state = models.JSONField(default=dict)
+    reversed_at = models.DateTimeField(null=True, blank=True)
+    reversed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name='stocktake_reversals')

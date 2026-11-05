@@ -1,0 +1,516 @@
+{
+  "supported": [
+    "integrated-v3",
+    "bridge-v1",
+    "inbound-v1"
+  ],
+  "files": [
+    {
+      "path": "config/settings.py",
+      "accepted_previous_sha256": [
+        "1be44602992c7907f65d55c4fc61e137f9d0fb1e45547edd62d6bdbab9d857e7"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "config/urls.py",
+      "accepted_previous_sha256": [
+        "14fba2697229322ea74d3e02c358c4b447e7f92c29a08b0ff82e44bcbb4f8038",
+        "8e0b89a23805e5bb04432f6fdb2f8be206892446d150bbccd768f20c1c2e74ef"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/access.py",
+      "accepted_previous_sha256": [
+        "75e3131cd00bcbc1979832645c37a799e04ed39c0fdcc88797889c4fa86e7583"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/apps.py",
+      "accepted_previous_sha256": [],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/cleanup.py",
+      "accepted_previous_sha256": [
+        "50f2bc5825600267a6a23af7cd5f2a3512dcee26451d06c0dbf75488a22c6ae5"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/cleanup_views.py",
+      "accepted_previous_sha256": [],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/customer_picking.py",
+      "accepted_previous_sha256": [
+        "1e58d6eca7c3d7e8d13e73d4cea5b844bc1c9726e56b5bfda781889ef3ab05a1",
+        "364374a719777adb45bec7a689d521fb4df17c4e3b9d4bf1a089e2ce042d402b"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/delivery_bridge.py",
+      "accepted_previous_sha256": [
+        "eb7af45dadc2852e0b849d2ca3f77e92f92b70638ea963b9c7566096e51a44a3"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/forms.py",
+      "accepted_previous_sha256": [
+        "4a35e22fe13b24fed8e19becf9dd35d8c584277391bf7ab8bee2222d96220138",
+        "68e30c185fe6c8fb8e51791b0cb0d261d519bfe4ee72377409a216e0eea105c9"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/history.py",
+      "accepted_previous_sha256": [
+        "1ff43370c36966505d9d81295845f7117d5ea666ddbb96add2821b16c6254462"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/inbound_views.py",
+      "accepted_previous_sha256": [
+        "9c6f189c8ea93c72b4c7c272a0c062a8ab569411bf0ad4ea5197ff71d408eb5a"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/location_planner.py",
+      "accepted_previous_sha256": [
+        "cc636eba26cc2b2fbac6eeef77072367a8be7d9ba045546fd8be8927c7a7b083"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/locking.py",
+      "accepted_previous_sha256": [
+        "9e598148a738b8bf41e454fcc672c1517959b71449c4b03f83e762f775b9c844"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/menu_permissions.py",
+      "accepted_previous_sha256": [
+        "31378b60b634e476b34e42d3eca63aa7059e23b27ee7269c09370e09f5599bba"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/migrations/0014_stocktake_and_cleanup.py",
+      "accepted_previous_sha256": [],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/models.py",
+      "accepted_previous_sha256": [
+        "b871cf5df495a4c46e6548c5d66662be182ee8d083c36f1bd166c9db4540a083"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/picking.py",
+      "accepted_previous_sha256": [
+        "08847e55a1d9b8751fa4ba78d9d05ac4aa1999b1d03e69871c0adca89633a8a7",
+        "9f779ac94859cb76ec729b633c0374f0ed17e1c0f37d8614e3279161bf01d445"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/picking_totals.py",
+      "accepted_previous_sha256": [
+        "80dda1137848c47f684a31d49c93c71b1c8c105e00f70b0678c598d4c1a4cadc"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/production.py",
+      "accepted_previous_sha256": [
+        "0d86ee8e518df3f4b7156b59d9337226e62e478508970cf728a936d80a8591ea"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/production_reader.py",
+      "accepted_previous_sha256": [],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/reassignment.py",
+      "accepted_previous_sha256": [
+        "c1d0ece4fd70f6dffac769cccd8b233e1dd522854284257d9f45a5b63ee634a8"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/revision_signals.py",
+      "accepted_previous_sha256": [],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/services.py",
+      "accepted_previous_sha256": [
+        "a4ef54acbad7dce53c6a09111d7e215bb783df3f27566c423155f17595303b63"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/static/inventory/allocation_selection.js",
+      "accepted_previous_sha256": [
+        "0e5aa5bfa32f0965366f7a63bf010db4becd49f85b04bd9f1f878ba1c629d2ce",
+        "3a8a1483f4478c41213a3452f254007d79a47ce30e4a8563e38c4d65249d17f7"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/static/inventory/inbound.css",
+      "accepted_previous_sha256": [
+        "d39e850169d2025f0b55b3f5da820d6d28415342ccdce29a106ec547bcae143c"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/static/inventory/inbound_core.js",
+      "accepted_previous_sha256": [
+        "c06f8309aadc21f91874516eeaac66e43ed6278c19c5e2c316c89fedb2118a0a"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/static/inventory/inbound_ui.js",
+      "accepted_previous_sha256": [
+        "a057150e2e0c2b376cd5ce3852bc7ea74b4187b944e4c7b7f8d71550a9240f71"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/static/inventory/inbound_worker.js",
+      "accepted_previous_sha256": [
+        "fe5498a375dfafb51e4f71d02576ff4744bb3bbf766919a7bff1d01d4d617386"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/static/inventory/live_stock.js",
+      "accepted_previous_sha256": [
+        "65ac1717c274700440a0d9a52583c1c12280c2a8339f61459e097048dfc2f5cf",
+        "f1bd054f55fbf833ffdde60e1e12e095ce540e0c67e5fcb9fe8fe87b8b0d1a50"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/static/inventory/mobile.css",
+      "accepted_previous_sha256": [
+        "6190c5f0a06d4f7b261e60d105e81b72544d20151e90309b52b0276a0a75ce3f",
+        "bb676d2cfe04bcfb8146dae88c6b1aab3617c13848088b25a7609758a6362905"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/static/inventory/production_plan.js",
+      "accepted_previous_sha256": [
+        "aecf0be756ba4d83ff2f1a931f98fc1bdffd85ecc5326d79b8631bb3a0436d5b"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/static/inventory/vendor/LICENSE.SheetJS.txt",
+      "accepted_previous_sha256": [
+        "4d2a38ac35cda06a555c84074a819d413339cd3691b822cae50f8f322fe01f64"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/static/inventory/vendor/README.txt",
+      "accepted_previous_sha256": [
+        "8e4371810778a00f3e77836168432ccd4f89fcdd9731a2156172799f51ec21d6"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/static/inventory/vendor/xlsx.full.min.js",
+      "accepted_previous_sha256": [],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/static/inventory/workspace.css",
+      "accepted_previous_sha256": [],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/static/inventory/workspace.js",
+      "accepted_previous_sha256": [],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/stocktake.py",
+      "accepted_previous_sha256": [],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/stocktake_views.py",
+      "accepted_previous_sha256": [],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/tabular.py",
+      "accepted_previous_sha256": [
+        "88a34a3b6107bdb43efc11fb82f8f497198f75041532a911dcc83c9cc4c6a9f4"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/templates/inventory/allocation_history.html",
+      "accepted_previous_sha256": [
+        "08418bec433164179284943cccb102e3027795ac70b869b4a6be0e12d1b50a26"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templates/inventory/allocations.html",
+      "accepted_previous_sha256": [
+        "aaea59652494cd86c0596a13116c51ee81e658fb8ccb33d865833704749db3cc",
+        "ed75bb94925724e6365848cf45763e44f3bca19ded7c5a2336b0f26f69569229"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/templates/inventory/archives.html",
+      "accepted_previous_sha256": [
+        "be97635c35ecac15646a3d7661bfa66d1f08366f4dcc69ee80dacc7aefcfd575"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templates/inventory/base.html",
+      "accepted_previous_sha256": [
+        "419a6569694ba331a9756dbdcae92ba37343878c8ce9af96be48a285ebf2c631",
+        "b3a4810a2016b3dace10b80c2fac29f09150e880a7140a50fe74078032174d5f",
+        "b9bb9c9b7675f02087f4db182dbb20fafe5f5fa4ad9e5d014a2f0247783f8efe"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/templates/inventory/cleanup.html",
+      "accepted_previous_sha256": [
+        "c17dcd31460cb4b3aef0719008badd96a3af9196c6379de173d27f10a3dd1c97"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templates/inventory/cleanup_decisions.html",
+      "accepted_previous_sha256": [],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templates/inventory/delivery_done.html",
+      "accepted_previous_sha256": [
+        "74ef4e32537e1b92710511be859a21befec8164def4e3125d261f08a05953c44"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templates/inventory/delivery_receiver.html",
+      "accepted_previous_sha256": [
+        "ecdbb331196599ebc396541afcf87cc25fd7dd101ae4a48e3e879d95e660c5e4"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templates/inventory/erp_detail.html",
+      "accepted_previous_sha256": [
+        "9e912f1d914a380c78b6fec8f67ce3b66a032e4388d7df9dcf3d5f92f6fbd656"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templates/inventory/erp_list.html",
+      "accepted_previous_sha256": [
+        "bbb411e308dba09936c2b86428db9b29c06d015ee80bb24f7927f798181e6093"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templates/inventory/history.html",
+      "accepted_previous_sha256": [
+        "d6016c392c6c1cc739527316aaf89c35d215a3847aebf922f64f3963383397d4"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templates/inventory/inbound_list.html",
+      "accepted_previous_sha256": [
+        "51f4aaa71ef30a9cd2e79da0221e626edae66b2abb3b6854c04fe18f4452f984"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templates/inventory/movement_results.html",
+      "accepted_previous_sha256": [
+        "881a2caaeeacf8ae2c72c21d69e7fbf16299d6352ecdb114aa8931b018a5e2e5"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templates/inventory/picking_detail.html",
+      "accepted_previous_sha256": [
+        "b7f791f48230346e62c0da7e7a209405c58d52d08b70ebf2aca48f3db518a2b0",
+        "b8bef3cb5ca39ff5404472ad373a6b36ec45ca4b47dc143451efac0f7c153729"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/templates/inventory/picking_list.html",
+      "accepted_previous_sha256": [
+        "034c7a21f95a0cc8657e057e4bbd5dad9f2e8eac1aa9bdbebd635e40a77f0e36"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templates/inventory/production_plan.html",
+      "accepted_previous_sha256": [
+        "7e1322074973f40f0d9d6394151247a9bd37275e5ed430e4a65ff7ba80eda88d"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templates/inventory/receipts.html",
+      "accepted_previous_sha256": [
+        "a977f680a987fcc15366f1647d367adb67171fd33b20b2e331b3513a66707846"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templates/inventory/scroll_page.html",
+      "accepted_previous_sha256": [],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templates/inventory/stock_allocations.html",
+      "accepted_previous_sha256": [
+        "e9f9cda31ee811a053e4acac0542d295082dc7a72cb8caccff3a209cd252ac9f"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templates/inventory/stock_results.html",
+      "accepted_previous_sha256": [
+        "60e92ba2ddbbd22bb127067343b40e6dadfda2a90e0386f72b97bd285c6f2716",
+        "9ccfa677bbdcfe07865518c4e00fcea945811cf3ed3e4a7c3dceae090a6faf3a"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/templates/inventory/stocktake_adjust.html",
+      "accepted_previous_sha256": [],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templates/inventory/stocktake_detail.html",
+      "accepted_previous_sha256": [],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templates/inventory/stocktake_index.html",
+      "accepted_previous_sha256": [],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templates/inventory/substitution_list.html",
+      "accepted_previous_sha256": [
+        "c1295c0b52a527c6c7db925c0f4860451707830d78fc5d51a82db1d56573614b"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templatetags/inventory_text.py",
+      "accepted_previous_sha256": [
+        "f52e6e0b1f66c67e8a4fd34ed04384f7ed004f5bc5af58b0c3f53d79d0b83e83"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/templatetags/scrolling.py",
+      "accepted_previous_sha256": [],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/test_delivery_bridge.py",
+      "accepted_previous_sha256": [
+        "5943c06da54c0748985ccf25f3232fdcbe79b9e0be3b6819b3b3cab42b10b761"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/test_improvements.py",
+      "accepted_previous_sha256": [
+        "40833f94a0e41b9e2a310fa59336f782da1bc396b044b134cda4c6f79a829146"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/test_inbound.py",
+      "accepted_previous_sha256": [
+        "53099d6a03676d47550f426d008e08edf2df4dfe945f6e6be0a5b7db25047674"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/test_production.py",
+      "accepted_previous_sha256": [
+        "84f0990b91419383a0ec2c9953d581acff8eca6fcc1587e49b755665b52a6b26"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/test_production_integration.py",
+      "accepted_previous_sha256": [
+        "ab979bc3b285059de18c21887e97c11b4e9896aaadc299b7b6123f7088c8ef1f"
+      ],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/test_stock_mobile_search.py",
+      "accepted_previous_sha256": [
+        "90e5f418a1079d815274d812f4849f6d0e4021c1d11a812efaf6e1e846fa4fab",
+        "bff5297404c00baae1164532da41d2b4397e9584c5287ae241da73b7a8b2c0df"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/test_stock_sort.py",
+      "accepted_previous_sha256": [
+        "5d775543957088580600d0701b9061c39c248ab975ee5d3c60d2f4f81db9d08c",
+        "8af88b8d92523783f21d1891fd2e5cde02c44bfb0c59be176d2fe053eb962f7b"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "inventory/test_stocktake.py",
+      "accepted_previous_sha256": [],
+      "required_existing": false
+    },
+    {
+      "path": "inventory/views.py",
+      "accepted_previous_sha256": [
+        "3c61ab7b1b0dcf7e152a08fd32d9be54247dcafbb23f7a81709f0fbd07ba716d",
+        "4c12f2259a1fcc29f91fb2acd7586b230221cb646452d37e664c0e3aabb728ac",
+        "bbeada396a453e70ab8ce801c4e976679aaf3698cc9bc64ecbc659801170ec93"
+      ],
+      "required_existing": true
+    },
+    {
+      "path": "manage.py",
+      "accepted_previous_sha256": [
+        "ed3b9b4427b735f83b9086979e880c676006a8567df3bbbf37e5f963d5020b37"
+      ],
+      "required_existing": true
+    }
+  ]
+}

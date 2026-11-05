@@ -2,7 +2,7 @@ from io import BytesIO
 from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
 from .production import open_workbook, extract, settings_for
 from .production_mapping import KEYS, LABELS, resolve, MappingError
@@ -78,7 +78,7 @@ class ProductionTests(TestCase):
         self.assertContains(self.apply(mapping,revision='old'),'다른 창에서 파일이 변경')
         self.assertEqual(ProductionPlanSnapshot.objects.get(pk=1).rows,previous)
     def test_custom_sheet_header_and_saved_selector(self):
-        content,mapping=fixture(renamed=True);wb=open_workbook(content);ws=wb.active
+        content,mapping=fixture(renamed=True);wb=load_workbook(BytesIO(content));ws=wb.active
         ws['A2']='나의 생산일';out=BytesIO();wb.save(out);wb.close();self.upload(out.getvalue())
         self.assertEqual(self.apply(mapping,sheet='다른 시트').status_code,302)
         saved=ProductionPlanDraft.objects.get(user=self.staff).config
@@ -111,7 +111,7 @@ class ProductionTests(TestCase):
         self.assertFalse(ProductionPlanSnapshot.objects.exists())
 
     def test_duplicate_original_header_needs_manual_choice(self):
-        content,mapping=fixture();wb=open_workbook(content)
+        content,mapping=fixture();wb=load_workbook(BytesIO(content))
         ws=wb.active;ws['N2']='생산잔량';out=BytesIO();wb.save(out);wb.close()
         self.upload(out.getvalue());response=self.client.get('/production/settings/')
         field=next(f for f in response.context['fields'] if f['key']=='P')

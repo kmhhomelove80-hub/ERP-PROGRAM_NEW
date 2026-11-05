@@ -49,6 +49,9 @@ jobs:
       - run: python manage.py check
       - run: python manage.py makemigrations --check --dry-run
       - run: python manage.py test --noinput
+      - run: python scripts/smoke_stocktake_pg.py
+        env:
+          ERP_TEST_PG_CONTAINER: ${{ job.services.postgres.id }}
   browser:
     runs-on: ubuntu-latest
     env:
@@ -60,6 +63,7 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install -r requirements.txt playwright==1.62.0 pymupdf==1.26.7
       - run: python scripts/fetch_inbound_vendor.py
+      - run: python scripts/smoke_stocktake.py
       - run: python scripts/smoke_inbound.py
       - run: python scripts/smoke_production.py
       - run: python scripts/smoke_menu_permissions.py

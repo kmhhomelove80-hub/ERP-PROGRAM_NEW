@@ -1,0 +1,1 @@
+{% load scrolling %}{% if page_obj %}<nav data-scroll-page class="no-print" aria-label="추가 목록 조회">{% if page_obj.has_next %}<a data-scroll-next href="{% next_page_url page_obj %}">아래로 내려 더 보기</a>{% else %}<span>전체 {{ page_obj.paginator.count }}건 · 목록 끝</span>{% endif %}<span data-scroll-status role="status" aria-live="polite"></span></nav>{% endif %}

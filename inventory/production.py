@@ -12,10 +12,8 @@ def open_workbook(content):
     if not content or len(content) > MAX_UPLOAD:
         raise ValueError('10MB 이하의 엑셀 파일을 선택해 주세요.')
     try:
-        with ZipFile(BytesIO(content)) as z:
-            if sum(f.file_size for f in z.infolist()) > 80 * 1024 * 1024 or len(z.infolist()) > 5000:
-                raise ValueError('압축 해제 크기가 너무 큰 파일입니다.')
-        return load_workbook(BytesIO(content), data_only=True, keep_links=False)
+        from .production_reader import Book
+        return Book(content)
     except (BadZipFile, KeyError, OSError) as exc:
         raise ValueError('읽을 수 있는 XLSX/XLSM 파일이 아닙니다.') from exc
 

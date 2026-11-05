@@ -29,7 +29,7 @@ Allocation.objects.create(stock=s,project='OTHER',quantity=999)
    browser=play.chromium.launch(executable_path=os.environ.get('ERP_CHROMIUM','/usr/bin/chromium'),args=['--no-sandbox'])
    page=browser.new_page(viewport={'width':1500,'height':900},accept_downloads=True);errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.on('dialog',lambda d:d.accept())
    page.goto(base+'/login/');page.locator('[name=username]').fill('fixture');page.locator('[name=password]').fill(password);page.get_by_role('button',name='로그인',exact=True).click();page.wait_for_url(base+'/')
-   for _ in range(3):page.locator('[data-stock-more]').scroll_into_view_if_needed();page.wait_for_timeout(350)
+   for _ in range(3):page.locator('.desktop-stock-table').evaluate('(el)=>el.scrollTop=el.scrollHeight');page.wait_for_timeout(350)
    expect(page.locator('.desktop-stock-table [data-stock-id]')).to_have_count(111)
    assert len(set(page.locator('.desktop-stock-table [data-stock-id]').evaluate_all('(els)=>els.map(e=>e.dataset.stockId)')))==111
    page.locator('[name=q]').fill('L003');expect(page.locator('.desktop-stock-table [data-stock-id]')).to_have_count(1)

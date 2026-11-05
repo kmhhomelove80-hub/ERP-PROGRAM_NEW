@@ -22,11 +22,11 @@ with tempfile.TemporaryDirectory() as td:
     code='''import sys
 sys.path.insert(0,'.')
 from inventory.test_production import fixture
-from inventory.production import open_workbook
+from openpyxl import load_workbook
 from pathlib import Path
 from io import BytesIO
 raw,mapping=fixture(1,True)
-w=open_workbook(raw);s=w.active
+w=load_workbook(BytesIO(raw));s=w.active
 s[f"{mapping['Z']}4"]='ERP-CODE-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 s[f"{mapping['AB']}4"]='<script>window.bad=1</script>'
 s[f"{mapping['S']}4"]='=HYPERLINK("https://example.test")'
@@ -92,6 +92,7 @@ w.save(sys.argv[1]);w.close()
             page.locator('#plan-table tbody tr').first.click()
             page.screenshot(path=str(artifacts/'desktop.png'),full_page=True)
             page.set_viewport_size({'width':390,'height':844})
+            page.locator('#mobile-menu-toggle').click()
             assert page.get_by_role('link',name='생산계획조회',exact=True).is_visible()
             menus=page.locator('.primary-nav > details')
             for index in range(menus.count()):

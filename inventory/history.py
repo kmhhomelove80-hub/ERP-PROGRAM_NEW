@@ -1,5 +1,9 @@
 def event_summary(event):
     d = event.detail
+    if event.action=='stocktake_apply':return f"실사·조정 {d.get('rows',0)}행 / 증감 {d.get('delta',0)} / 검증 백업 후 반영"
+    if event.action=='stocktake_reverse':return f"실사·조정 {d.get('rows',0)}행 되돌리기"
+    if event.action=='cleanup_keep':return f"{d.get('source_location','')} → {d.get('destination','')} · 기존 유지"
+    if event.action=='cleanup_keep_cancel':return '기존 유지 판정 취소'
     if event.action == 'allocation_reassign':
         before = d.get('before', {})
         source = before.get('details', {}).get('location', '')

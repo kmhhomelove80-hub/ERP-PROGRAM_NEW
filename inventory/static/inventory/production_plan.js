@@ -5,13 +5,13 @@
   const table = get('plan-table'), detail = get('plan-selected');
   const query = get('plan-query'), scope = get('plan-scope'), schedule = get('plan-schedule');
   const compare = new Intl.Collator('ko', {numeric:true, sensitivity:'base'});
-  let filtered = [], page = 0, sortColumn = null, descending = false, selected = null;
+  let filtered = [], visible = 100, sortColumn = null, descending = false, selected = null;
   const size = 100;
   const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
   ctx.font = '14px system-ui';
   const widths = [70,160,110,110,65,65,300,170,180,260];
   for (const [col,index] of [[1,0],[8,7]]) {
-    widths[col] = Math.ceil(Math.max(widths[col], ...data.map(r => ctx.measureText(r.values[index]).width + 28)));
+    widths[col] = Math.ceil(Math.max(widths[col], ...[...new Set(data.map(r=>r.values[index]))].map(value=>Math.min(900,ctx.measureText(value).width+28))));
   }
   for (const target of [table,detail]) {
     const group = target.querySelector('colgroup');
@@ -35,7 +35,7 @@
   }
   function render() {
     const fragment=document.createDocumentFragment();
-    for (const row of filtered.slice(page*size,(page+1)*size)) {
+    for (const row of filtered.slice(0,visible)) {
       const tr=cells(row);tr.tabIndex=0;tr.dataset.row=row.row;tr.setAttribute('aria-selected',String(selected?.row===row.row));
       tr.addEventListener('click',()=>select(row));
       tr.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(row);}});
@@ -43,8 +43,8 @@
     }
     table.tBodies[0].replaceChildren(fragment);
     get('plan-count').textContent=`검색 결과 ${filtered.length.toLocaleString()}건 / 전체 ${data.length.toLocaleString()}건`;
-    get('plan-page').textContent=`${page+1} / ${Math.max(1,Math.ceil(filtered.length/size))} 페이지`;
-    get('plan-prev').disabled=page===0;get('plan-next').disabled=(page+1)*size>=filtered.length;
+    get('plan-page').textContent=`${Math.min(visible,filtered.length)} / ${filtered.length}행 표시 · 아래로 스크롤해 계속 조회`;
+    get('plan-next').hidden=visible>=filtered.length;
   }
   function filter() {
     const words=query.value.toLocaleLowerCase().split(/\s+/).filter(Boolean);
@@ -54,7 +54,7 @@
       return words.every(word=>text.includes(word));
     });
     if(sortColumn!==null) filtered.sort((a,b)=>compare.compare(String(sortColumn===0?a.row:a.values[sortColumn-1]),String(sortColumn===0?b.row:b.values[sortColumn-1]))*(descending?-1:1));
-    page=0;
+    visible=size;
     if(selected && !filtered.some(r=>r.row===selected.row)) {
       selected=null;detail.tBodies[0].replaceChildren();get('plan-parts').querySelectorAll('dd').forEach(dd=>dd.textContent='—');
     }
@@ -67,8 +67,8 @@
     button.parentElement.setAttribute('aria-sort',descending?'descending':'ascending');filter();
   });
   get('plan-reset').addEventListener('click',()=>{query.value='';scope.value='';schedule.value='';filter();});
-  get('plan-prev').addEventListener('click',()=>{page--;render();});get('plan-next').addEventListener('click',()=>{page++;render();});
-  get('plan-scroll').addEventListener('scroll',()=>get('detail-scroll').scrollLeft=get('plan-scroll').scrollLeft);
+  get('plan-next').addEventListener('click',()=>{visible+=size;render();});
+  get('plan-scroll').addEventListener('scroll',()=>{const area=get('plan-scroll');get('detail-scroll').scrollLeft=area.scrollLeft;if(area.scrollTop+area.clientHeight>=area.scrollHeight-150&&visible<filtered.length){visible+=size;render();}});
   get('plan-export').addEventListener('click',()=>{
     const escape=value=>'"'+String(value).replace(/^[=+@\-\t\r]/,"'$&").replaceAll('"','""')+'"';
     const rows=[[...table.tHead.rows[0].cells].map(th=>th.textContent.trim()),...filtered.map(r=>[r.row,...r.values])];

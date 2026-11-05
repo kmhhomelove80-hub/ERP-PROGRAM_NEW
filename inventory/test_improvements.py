@@ -161,7 +161,7 @@ class ImprovementWorkflowTests(TestCase):
             a.legacy_seq='SEQ-01';a.save()
         other=reserve(stock_id=self.stock.pk,project='기타',quantity=1,actor=self.user)
         response=self.client.get('/allocations/?q=목표&seq=SEQ-01')
-        self.assertEqual(len(response.context['allocations']),50)
+        self.assertEqual(len(response.context['allocations']),52)
         self.assertEqual(response.context['total'],52)
         token=response.context['filter_token']
         response=self.client.post('/allocations/?q=목표&seq=SEQ-01',dict(scope='filtered',filter_token=token,action='release',confirmed='on',shipped_at=(timezone.now()-timedelta(minutes=1)).isoformat()))

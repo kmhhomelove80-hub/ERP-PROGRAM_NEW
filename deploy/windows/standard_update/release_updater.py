@@ -22,7 +22,7 @@ import uuid
 VAULT_COMMAND = "$c=Get-Content -LiteralPath $env:SUNIL_CONFIG_PATH -Raw|ConvertFrom-Json; $v=Import-Clixml -LiteralPath $c.SecretsPath; $s=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value; if($v.OwnerSid -ne $s){throw 'Run as the original secret owner'}; $r=@{sid=$s}; foreach($n in @('ERP_SECRET_KEY','ERP_DB_PASSWORD')){$r[$n]=[Management.Automation.PSCredential]::new('unused',$v.Secrets[$n]).GetNetworkCredential().Password}; $r|ConvertTo-Json -Compress"
 
 TERMINAL = {'complete', 'rolled_back', 'no_changes'}
-ALLOWED_MIGRATIONS = {('inventory', '0012_production_plan'), ('inventory', '0013_employee_menu_access')}
+ALLOWED_MIGRATIONS = {('inventory', '0012_production_plan'), ('inventory', '0013_employee_menu_access'), ('inventory', '0014_stocktake_and_cleanup')}
 
 
 def digest(path):
@@ -104,7 +104,7 @@ def exclusive_lock(path):
 
 
 def validate_payload(release, app, manifest, installed=True):
-    if manifest.get('format') != 3 or manifest.get('target_migration') != '0013_employee_menu_access':
+    if manifest.get('format') != 3 or manifest.get('target_migration') not in ('0013_employee_menu_access','0014_stocktake_and_cleanup'):
         raise RuntimeError('이 업데이트의 배포 명세가 아닙니다.')
     expected_helpers = {'Update-Erp.py', 'release_updater.py', 'release_probe.py', 'update_snapshot.py'}
     if set(manifest.get('helpers', {})) != expected_helpers:
@@ -483,7 +483,7 @@ class WindowsOps:
     def migrate(self):
         plan=self.probe('plan')
         if any(backwards or (app,name) not in ALLOWED_MIGRATIONS for app,name,backwards in plan):
-            raise RuntimeError('0012·0013 외의 예상하지 않은 마이그레이션이 있습니다. DB 변경을 시작하지 않습니다.')
+            raise RuntimeError('0012·0013·0014 외의 예상하지 않은 마이그레이션이 있습니다. DB 변경을 시작하지 않습니다.')
         self.command([sys.executable,'manage.py','migrate','--noinput'],'migrate',600)
 
     def validate(self,old=False):
