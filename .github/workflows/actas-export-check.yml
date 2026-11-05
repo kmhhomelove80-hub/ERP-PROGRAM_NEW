@@ -16,3 +16,5 @@ jobs:
         with:
           python-version: '3.12'
       - run: python scripts/test_actas_export_check.py
+      - run: python scripts/test_actas_query_probe.py
+      - run: python scripts/test_actas_schedule.py
