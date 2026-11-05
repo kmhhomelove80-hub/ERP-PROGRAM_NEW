@@ -48,3 +48,5 @@
 }
 
 @media screen{main{max-width:1600px}.card>label:has(input[type=radio]){display:flex;gap:10px;align-items:center}}
+
+@media screen{.inbound-tool .scroll{max-height:68dvh;overflow:auto}.inbound-tool thead th{position:sticky;top:0;z-index:3}}

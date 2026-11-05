@@ -4,7 +4,7 @@ from collections import OrderedDict
 from types import SimpleNamespace
 from xml.etree import ElementTree as ET
 from zipfile import ZipFile,BadZipFile
-from openpyxl.styles.numbers import BUILTIN_FORMATS,is_date_format
+from openpyxl.styles.numbers import BUILTIN_FORMATS,is_date_format,is_timedelta_format
 from openpyxl.utils.cell import coordinate_to_tuple,range_boundaries
 from openpyxl.utils.datetime import from_excel,CALENDAR_MAC_1904,CALENDAR_WINDOWS_1900
 from openpyxl.worksheet.cell_range import MultiCellRange
@@ -30,7 +30,7 @@ class Sheet:
      elif raw is None:value=None
      else:
       value=float(raw) if any(x in raw for x in ('.','e','E')) else int(raw)
-      if int(node.get('s','0')) in book.dates:value=from_excel(value,book.epoch)
+      if int(node.get('s','0')) in book.dates:value=from_excel(value,book.epoch,timedelta=int(node.get('s','0')) in book.durations)
      self.values[(r,c)]=value;self.max_row=max(self.max_row,r);self.max_column=max(self.max_column,c);node.clear()
     elif node.tag==NS+'mergeCell':self.merged_cells.add(node.get('ref'));node.clear()
     elif node.tag==NS+'dimension':
@@ -42,7 +42,7 @@ class Sheet:
 
 class Book:
  def __init__(self,content):
-  self.archive=ZipFile(io.BytesIO(content));self.lock=threading.RLock();self.sheets={};self.strings=[];self.dates=set()
+  self.archive=ZipFile(io.BytesIO(content));self.lock=threading.RLock();self.sheets={};self.strings=[];self.dates=set();self.durations=set()
   infos=self.archive.infolist()
   if sum(f.file_size for f in infos)>80*1024*1024 or len(infos)>5000:raise ValueError('압축 해제 크기가 너무 큰 파일입니다.')
   workbook=ET.fromstring(self.archive.read('xl/workbook.xml'));prop=workbook.find(NS+'workbookPr');self.epoch=CALENDAR_MAC_1904 if prop is not None and prop.get('date1904') in ('1','true') else CALENDAR_WINDOWS_1900
@@ -71,6 +71,7 @@ class Book:
      if node.tag==NS+'xf' and len(stack)>1 and stack[-2]==NS+'cellXfs':xfs.append(int(node.get('numFmtId','0')))
      node.clear();stack.pop()
    self.dates={i for i,n in enumerate(xfs) if is_date_format(formats.get(n,BUILTIN_FORMATS.get(n,'')))}
+   self.durations={i for i,n in enumerate(xfs) if is_timedelta_format(formats.get(n,BUILTIN_FORMATS.get(n,'')))}
  def __getitem__(self,name):
   with self.lock:
    if name not in self.sheets:self.sheets[name]=Sheet(self,self.paths[name])

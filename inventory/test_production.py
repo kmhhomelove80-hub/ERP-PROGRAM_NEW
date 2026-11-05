@@ -117,3 +117,16 @@ class ProductionTests(TestCase):
         field=next(f for f in response.context['fields'] if f['key']=='P')
         self.assertTrue(field['unresolved'])
         self.assertEqual(self.apply(mapping).status_code,302)
+
+class ProductionValueParityTests(TestCase):
+    def test_fast_reader_matches_dates_durations_rich_text_and_merges(self):
+        from datetime import datetime,timedelta
+        from openpyxl.utils.datetime import CALENDAR_MAC_1904
+        for epoch in (None,CALENDAR_MAC_1904):
+            book=Workbook()
+            if epoch:book.epoch=epoch
+            sheet=book.active;sheet['A1']=datetime(2026,11,5,9,30);sheet['B1']=timedelta(hours=27,minutes=30);sheet['B1'].number_format='[h]:mm:ss';sheet['C1']=True;sheet['D1']='001';sheet['E1']='=1+2';sheet['F1']='한글 & <문자>';sheet.merge_cells('A2:A3');sheet['A2']='병합'
+            out=BytesIO();book.save(out)
+            original=load_workbook(BytesIO(out.getvalue()),data_only=True);fast=open_workbook(out.getvalue())
+            for address in ('A1','B1','C1','D1','E1','F1','A2','A3'):self.assertEqual(fast.active[address].value,original.active[address].value,address)
+            self.assertEqual(str(fast.active.merged_cells),str(original.active.merged_cells));fast.close();original.close()
