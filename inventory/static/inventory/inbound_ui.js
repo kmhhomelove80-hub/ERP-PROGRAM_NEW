@@ -3,7 +3,7 @@
 const root=document.getElementById('inbound-tool');if(!root||!document.getElementById('inbound-file'))return;
 const $=id=>document.getElementById('inbound-'+id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=n=>n.toLocaleString('ko-KR',{maximumFractionDigits:12});
-let rows=[],undoRows=null,invalid=true,revision=0,controller=null,worker=null,fileSerial=0,choices={},candidates={};
+let rows=[],undoRows=null,invalid=true,sampleOnly=false,revision=0,controller=null,worker=null,fileSerial=0,choices={},candidates={};
 $('date').value=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
 const title=()=>$('date').value.replaceAll('-','. ')+'. 입고 LIST';
 function tab(preview){$('editor').hidden=preview;$('preview').hidden=!preview;$('editTab').classList.toggle('active',!preview);$('previewTab').classList.toggle('active',preview);}
@@ -54,8 +54,8 @@ async function lookup(myRevision){
   locationTable();$('locationStatus').textContent=`${codes.length}개 코드 확인 완료 · 추천 위치 일괄 적용을 누르세요. 직접 작성한 비고는 보호합니다.`;
  }catch(e){if(e.name!=='AbortError'&&myRevision===revision)$('locationStatus').textContent='위치를 불러오지 못했습니다. 코드별 직접 지정은 가능합니다. '+e.message;}
 }
-function load(grid,name){
- const parsed=Inbound.parseGrid(grid);revision++;rows=parsed.rows;undoRows=null;choices={};candidates={};
+function load(grid,name,sample=false){
+ const parsed=Inbound.parseGrid(grid);sampleOnly=sample;revision++;rows=parsed.rows;undoRows=null;choices={};candidates={};
  $('workspace').hidden=false;$('filename').textContent=name;$('status').textContent=`상세 ${rows.length}행 불러옴 · 합계 등 ${parsed.skipped}행 제외`;
  $('undoDelete').disabled=true;editor();locationTable();tab(false);update();lookup(revision);
 }
@@ -92,6 +92,7 @@ function legacyCopy(data){
 $('receive').onclick=()=>{
  update();if(invalid)return;
  try{
+  if(sampleOnly)throw Error('가상 예제는 실제 입고로 보낼 수 없습니다. 실제 입고 파일을 선택하세요.');
   const cells=Inbound.erpCells(rows);
   if(cells.length>1000)throw Error('입고 화면으로는 한 번에 1,000행까지 보낼 수 있습니다.');
   if(cells.some(r=>!String(r[4]??'').trim()))throw Error('모든 행의 최종 비고에 로케이션을 입력하세요.');
@@ -128,7 +129,7 @@ async function openFile(file){
  }catch(e){if(fileVersion===fileSerial)$('status').textContent='불러오기 실패: '+e.message;}finally{if(fileVersion===fileSerial)$('file').value='';}
 }
 $('file').onchange=e=>openFile(e.target.files[0]);$('drop').ondragover=e=>e.preventDefault();$('drop').ondrop=e=>{e.preventDefault();openFile(e.dataTransfer.files[0]);};
-$('sample').onclick=()=>{if(rows.length&&!confirm('현재 자료를 가상 예제로 바꿀까요?'))return;load([['품목코드','품목명','규격','수량','적요','비고'],['DEMO-001','가상 조명','20W',64,'ERP 참고 적요','32+32'],['품목별 합계','','',64],['DEMO-002','가상 부품','50W',12,'참고 정보',''],['전체 합계','','',76]],'가상 ERP 예제');};
+$('sample').onclick=()=>{if(rows.length&&!confirm('현재 자료를 가상 예제로 바꿀까요?'))return;load([['품목코드','품목명','규격','수량','적요','비고'],['DEMO-001','가상 조명','20W',64,'ERP 참고 적요','32+32'],['품목별 합계','','',64],['DEMO-002','가상 부품','50W',12,'참고 정보',''],['전체 합계','','',76]],'가상 ERP 예제',true);};
 $('print').onclick=()=>{update();if(invalid)return;tab(true);window.print();};
 window.addEventListener('beforeprint',update);
 $('download').onclick=()=>{
