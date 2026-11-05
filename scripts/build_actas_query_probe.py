@@ -8,7 +8,7 @@ import zipfile
 def build(output):
     root = Path(__file__).resolve().parents[1]
     guide = root / 'deploy/windows/actas-query-probe'
-    files = {name: (root / 'scripts' / name).read_bytes() for name in ('actas_query_probe.py', 'actas_export_check.py')}
+    files = {name: (root / 'scripts' / name).read_bytes() for name in ('actas_query_probe.py', 'actas_export_check.py', 'actas_conditions_ocr.ps1')}
     for name in ('Probe-Query.cmd', 'README-FIRST.txt'):
         files[name] = (guide / name).read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n')
     files['SHA256SUMS.txt'] = ''.join(hashlib.sha256(value).hexdigest() + '  ' + name + '\n'

@@ -32,7 +32,7 @@ class ProbeTests(unittest.TestCase):
     def run_probe(self, adapter):
         temp=tempfile.TemporaryDirectory();self.addCleanup(temp.cleanup)
         self.root=Path(temp.name)
-        return probe.run_probe(adapter,self.root,delay=0,duration=0,sampler_factory=Sampler,progress=lambda text:None)
+        return probe.run_probe(adapter,self.root,delay=0,duration=0,sampler_factory=Sampler,ocr_reader=lambda p:dict(status='synthetic'),progress=lambda text:None)
     def test_probe_queries_current_code_once_and_never_claims_completion_or_import(self):
         adapter=Adapter();folder,report=self.run_probe(adapter)
         self.assertEqual(adapter.queries,['Y09'])
@@ -72,6 +72,10 @@ class ProbeTests(unittest.TestCase):
             width,height=struct.unpack_from('<ii',data,18)
             self.assertEqual((width,height),(240,-120));self.assertEqual(len(data),54+240*120*4)
             self.assertTrue(all(v==255 for v in data[57::4]))
+            with tempfile.TemporaryDirectory() as tmp:
+                path=Path(tmp)/'synthetic.bmp';path.write_bytes(data)
+                result=probe.recognize_conditions(path, language='en-US')
+                self.assertIn(result['status'],('ok','language_unavailable'),result)
         finally:u.DestroyWindow(handle)
 
 

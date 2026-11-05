@@ -5,13 +5,32 @@ panel locally; grid pixels are hashed in memory and never saved to disk.
 """
 import argparse
 import hashlib
+import json
+import os
 from pathlib import Path
 import struct
+import subprocess
 import sys
 import time
 import uuid
 
 import actas_export_check as pilot
+
+
+def recognize_conditions(path, language='ko-KR'):
+    if os.name != 'nt':return dict(status='windows_required')
+    powershell = Path(os.environ['SystemRoot']) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
+    helper = Path(__file__).with_name('actas_conditions_ocr.ps1')
+    if not helper.is_file():return dict(status='helper_missing')
+    env = {**os.environ, 'PSModulePath': str(powershell.parent / 'Modules')}
+    result = subprocess.run([str(powershell), '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+                             '-File', str(helper), '-Image', str(Path(path).resolve()), '-Language', language],
+                            env=env, capture_output=True, encoding='utf-8', timeout=45)
+    try:
+        value = json.loads(result.stdout)
+        if value.get('status') in ('ok', 'language_unavailable', 'error'):return value
+    except (ValueError, AttributeError):pass
+    return dict(status='error', failure_type='OcrHelperOutput')
 
 
 def capture_client(adapter, handle):
@@ -130,7 +149,7 @@ def summarize(samples):
                 query_completion_verified=False)
 
 
-def run_probe(adapter, root, *, delay=12, duration=25, sampler_factory=NativeSampler, progress=print):
+def run_probe(adapter, root, *, delay=12, duration=25, sampler_factory=NativeSampler, ocr_reader=recognize_conditions, progress=print):
     root = Path(root);root.mkdir(parents=True, exist_ok=True)
     folder = root / uuid.uuid4().hex;folder.mkdir()
     report = dict(format=1, kind='Actas-query-signal-probe-NOT-export-import', phase='prepared',
@@ -159,6 +178,10 @@ def run_probe(adapter, root, *, delay=12, duration=25, sampler_factory=NativeSam
             sample('after_query');time.sleep(.03)
         report['summary'] = summarize(report['samples'])
         report['condition_capture'] = sampler.save_conditions(folder)
+        # Always preserve timing measurements even if optional local OCR fails.
+        pilot.save_json(path, report)
+        try:report['condition_ocr'] = ocr_reader(folder / report['condition_capture'])
+        except Exception as error:report['condition_ocr'] = dict(status='error', failure_type=type(error).__name__)
         report.update(phase='measurement_complete_NOT_query_completion', completed_at=pilot.now())
         pilot.save_json(path, report)
         return folder, report
