@@ -1,0 +1,43 @@
+{
+  "success": true,
+  "windows_native_success": true,
+  "windows_schedule_restore_success": true,
+  "postgresql18_success": true,
+  "postgresql18_backup_restore_success": true,
+  "browser_success": true,
+  "commit": "ff105d516f3043840aa9522a0c5af6263574f347",
+  "workflow_run": 42053920376,
+  "url": "https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/actions/runs/42053920376",
+  "jobs": [
+    {
+      "id": 127337040605,
+      "name": "browser",
+      "conclusion": "success"
+    },
+    {
+      "id": 127337041274,
+      "name": "windows-python312",
+      "conclusion": "success"
+    },
+    {
+      "id": 127337041658,
+      "name": "postgresql18",
+      "conclusion": "success"
+    }
+  ],
+  "supported_installation_apply_migration_restore": [
+    "integrated-v3",
+    "bridge-v1",
+    "inbound-v1"
+  ],
+  "payload_and_helper_source_blobs_verified": 78,
+  "production_file_measurement": {
+    "rows": 1503,
+    "original_seconds": 4.7,
+    "optimized_seconds": 0.613,
+    "values_dates_merges_and_mapping_equal": true
+  },
+  "physical_packing_confirmation": "사용자 현장 확인 필요",
+  "actual_erp_clipboard_paste": "현장 확인 필요",
+  "production_uploaded_workbooks_in_public_release": false
+}
