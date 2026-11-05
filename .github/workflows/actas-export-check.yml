@@ -18,3 +18,4 @@ jobs:
       - run: python scripts/test_actas_export_check.py
       - run: python scripts/test_actas_query_probe.py
       - run: python scripts/test_actas_schedule.py
+      - run: python scripts/test_actas_auto_collect.py

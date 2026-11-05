@@ -182,7 +182,7 @@ def run_check(adapter, root, confirm, progress=print, reader=wait_file):
     root.mkdir(parents=True, exist_ok=True)
     run = root / uuid.uuid4().hex
     run.mkdir()
-    report = {'format': 3, 'pilot_version': getattr(adapter, 'pilot_version', 3), 'kind': 'Actas-export-pilot-NOT-import', 'started_at': now(),
+    report = {'format': 3, 'pilot_version': getattr(adapter, 'pilot_version', 3), 'kind': getattr(adapter, 'report_kind', 'Actas-export-pilot-NOT-import'), 'started_at': now(),
               'phase': 'running', 'files': {}, 'registered_in_sunil': False,
               'automatic_query_completion_verified': False, 'warehouse_transition_verified': False}
     save_json(run / 'result.json', report)
@@ -196,7 +196,7 @@ def run_check(adapter, root, confirm, progress=print, reader=wait_file):
             if evidence is not None:
                 report.setdefault('input_evidence', {})[warehouse] = evidence
                 report['pilot_version'] = getattr(adapter, 'pilot_version', 4)
-            report.update(phase='awaiting_operator_' + warehouse)
+            report.update(phase=('awaiting_operator_' if getattr(adapter, 'confirmation_source', 'operator') == 'operator' else 'signals_observed_') + warehouse)
             save_json(run / 'result.json', report)
             if not confirm(warehouse):raise RuntimeError('담당자가 검증을 중단했습니다.')
             acknowledged = now()
@@ -205,7 +205,7 @@ def run_check(adapter, root, confirm, progress=print, reader=wait_file):
             adapter.save_export(path)
             data = reader(path)
             report['files'][warehouse] = {'name': path.name, 'sha256': hashlib.sha256(data).hexdigest(),
-                                          'parse_status': 'pending', 'query_confirmed_by': 'operator',
+                                          'parse_status': 'pending', 'query_confirmed_by': getattr(adapter, 'confirmation_source', 'operator'),
                                           'query_confirmed_at': acknowledged, 'saved_at': now()}
             save_json(run / 'result.json', report)
             try:
@@ -214,6 +214,7 @@ def run_check(adapter, root, confirm, progress=print, reader=wait_file):
                 report['files'][warehouse]['parse_status'] = 'invalid'
                 raise
             report['files'][warehouse].update(summary, parse_status='valid')
+            if evidence is not None:evidence['export_sent'] = True
             save_json(run / 'result.json', report)
             total = summary['quantity'] if summary['quantity'] is not None else '공란 포함 · 합계 미확정'
             progress(f"{warehouse}: {summary['items']}품목 / 현재고 합계 {total} / 소수 {summary['fractional_quantity_items']}품목")
@@ -221,11 +222,13 @@ def run_check(adapter, root, confirm, progress=print, reader=wait_file):
             raise RuntimeError('두 창고의 코드·수량 자료가 같습니다. 창고 전환 여부를 확인해야 합니다.')
         if report['files']['Y02']['code_set_digest'] == report['files']['Y09']['code_set_digest']:
             raise RuntimeError('두 파일의 품목 구성이 같아 창고 전환을 입증하지 못했습니다. 수량 변화만으로 성공 처리하지 않습니다.')
-        report.update(phase='export_files_checked', completed_at=now())
+        report.update(phase=getattr(adapter, 'checked_phase', 'export_files_checked'), completed_at=now())
+        if hasattr(adapter, 'events'):report['automatic_events'] = adapter.events
         save_json(run / 'result.json', report)
         return run, report
     except Exception as error:
         report.update(phase='failed', failed_at=now(), failure_type=type(error).__name__, failure_message=str(error))
+        if hasattr(adapter, 'events'):report['automatic_events'] = adapter.events
         save_json(run / 'result.json', report)
         progress('중단 기록: ' + str(run / 'result.json'))
         raise

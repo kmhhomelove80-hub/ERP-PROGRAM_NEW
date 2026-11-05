@@ -76,6 +76,8 @@ class ProbeTests(unittest.TestCase):
                 path=Path(tmp)/'synthetic.bmp';path.write_bytes(data)
                 result=probe.recognize_conditions(path, language='en-US')
                 self.assertIn(result['status'],('ok','language_unavailable'),result)
+                self.assertEqual((result['width'],result['height'],result['scale']),(240,120,3))
+                self.assertEqual((result['processed_width'],result['processed_height']),(720,360))
         finally:u.DestroyWindow(handle)
 
 

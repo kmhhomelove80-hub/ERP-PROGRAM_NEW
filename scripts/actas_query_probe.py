@@ -25,7 +25,8 @@ def recognize_conditions(path, language='ko-KR'):
     env = {**os.environ, 'PSModulePath': str(powershell.parent / 'Modules')}
     result = subprocess.run([str(powershell), '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
                              '-File', str(helper), '-Image', str(Path(path).resolve()), '-Language', language],
-                            env=env, capture_output=True, encoding='utf-8', timeout=45)
+                            env=env, capture_output=True, encoding='utf-8', timeout=45,
+                            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     try:
         value = json.loads(result.stdout)
         if value.get('status') in ('ok', 'language_unavailable', 'error'):return value
