@@ -191,7 +191,7 @@ class ActasRegistrationTests(TestCase):
 class ActasRuntimeTests(TestCase):
     def test_reads_temporary_dpapi_with_existing_python_and_no_config_writes(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp);app = root / 'app';app.mkdir();(app / 'manage.py').write_text('# synthetic app')
+            root = Path(tmp).resolve();app = root / 'app';app.mkdir();(app / 'manage.py').write_text('# synthetic app')
             secret = root / 'synthetic.clixml'
             config_path = root / 'runtime.local.json'
             config = dict(PythonExe=sys.executable, AppRoot=str(app), DataRoot=str(root / 'data'), SecretsPath=str(secret),
