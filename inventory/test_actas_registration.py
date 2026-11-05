@@ -198,10 +198,10 @@ class ActasRuntimeTests(TestCase):
                           Environment={'ERP_DB_NAME': 'synthetic-no-connection', 'ERP_DB_USER': 'synthetic'})
             config_path.write_text(json.dumps(config), encoding='utf-8')
             powershell = Path(os.environ['SystemRoot']) / 'System32/WindowsPowerShell/v1.0/powershell.exe'
-            code = "$ErrorActionPreference='Stop'; $v=[pscustomobject]@{OwnerSid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value; Secrets=@{ERP_SECRET_KEY=(ConvertTo-SecureString 'synthetic-key-only' -AsPlainText -Force); ERP_DB_PASSWORD=(ConvertTo-SecureString 'synthetic-password-only' -AsPlainText -Force)}}; $v | Export-Clixml -LiteralPath $env:SUNIL_TEST_SECRET"
+            code = "$ErrorActionPreference='Stop'; Import-Module Microsoft.PowerShell.Security; $v=[pscustomobject]@{OwnerSid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value; Secrets=@{ERP_SECRET_KEY=(ConvertTo-SecureString 'synthetic-key-only' -AsPlainText -Force); ERP_DB_PASSWORD=(ConvertTo-SecureString 'synthetic-password-only' -AsPlainText -Force)}}; $v | Export-Clixml -LiteralPath $env:SUNIL_TEST_SECRET"
             proc = subprocess.run([str(powershell), '-NoProfile', '-NonInteractive', '-Command', code],
-                env={**os.environ, 'SUNIL_TEST_SECRET': str(secret)}, capture_output=True, timeout=30)
-            self.assertEqual(proc.returncode, 0)
+                env={**os.environ, 'SUNIL_TEST_SECRET': str(secret), 'PSModulePath': str(powershell.parent / 'Modules')}, capture_output=True, timeout=30)
+            self.assertEqual(proc.returncode, 0, proc.stderr.decode('utf-8', errors='replace'))
             before = config_path.read_bytes(), secret.read_bytes()
             old_cwd, old_path = Path.cwd(), sys.path[:]
             try:
