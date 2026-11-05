@@ -20,15 +20,19 @@ def parse_customer(*, pasted='', upload=None):
                 raise ValidationError('고객 자료 헤더는 POR번호·호선·블록·품명·수량·ERP CODE 순서입니다.')
             break
     rows = []
+    width=7 if start and len(raw[start-1])>offset+6 and cell(raw[start-1][offset+6])=='합계' else 6
     for index, raw_row in enumerate(raw[start:], start+1):
-        values = [cell(v) for v in raw_row[offset:offset+6]]
+        row_width=7 if not start and len(raw_row)==7 else width
+        values = [cell(v) for v in raw_row[offset:offset+row_width]]
         if not any(values): continue
-        if len(values)!=6:
-            raise ValidationError(f'{index}행: 고객 자료 6열을 확인하세요.')
-        por, hull, block, name, qty, code = values
+        if len(values) not in (6,7):
+            raise ValidationError(f'{index}행: 고객 자료 6열 또는 7열을 확인하세요.')
+        por, hull, block, name, qty, code = values[:6]
         if not code or len(code)>100 or code.startswith(('=', '#')) or any(len(v)>2000 for v in [por,hull,block,name]):
             raise ValidationError(f'{index}행: ERP CODE와 고객 정보를 확인하세요.')
-        rows.append(dict(por=por, hull=hull, block=block, name=name, quantity=integer(qty,positive=True), code=code))
+        item=dict(por=por, hull=hull, block=block, name=name, quantity=integer(qty,positive=True), code=code)
+        if len(values)==7 and values[6]:item['total']=integer(values[6],positive=True)
+        rows.append(item)
     if not 1<=len(rows)<=500: raise ValidationError('고객 자료는 1~500행입니다.')
     return rows
 
@@ -57,3 +61,8 @@ def customer_print_groups(order):
             if not remaining:break
         groups.append(dict(rows=rows,total=total,locations=[dict(location=k[0],quantity=v,**({'actual_code':k[1]} if k[1] else {})) for k,v in locations.items()],shortage=remaining,expected=expected))
     return groups
+
+
+def serialize_customer(rows):
+    seven=any('total' in r for r in rows)
+    return '\n'.join('\t'.join(str(r[k]) for k in ['por','hull','block','name','quantity','code'])+('\t'+str(r.get('total','')) if seven else '') for r in rows)

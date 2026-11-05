@@ -49,7 +49,8 @@ class PickingInputForm(forms.Form):
         from .picking import parse_quantity_code
         text = self.cleaned_data['pasted_rows']
         return parse_quantity_code(text) if text.strip() else []
-    customer_rows = forms.CharField(label='고객 자료 6열 붙여넣기', required=False, max_length=300000, widget=forms.Textarea(attrs={'rows':8}), help_text='POR번호·호선·블록·품명·수량·ERP CODE. 기존 두 열 대신 사용하면 고객 양식도 인쇄할 수 있습니다.')
+    bridge_token = forms.CharField(required=False,max_length=1200000,widget=forms.HiddenInput)
+    customer_rows = forms.CharField(label='고객 자료 7열 붙여넣기 (기존 6열도 가능)', required=False, max_length=300000, widget=forms.Textarea(attrs={'rows':8}), help_text='POR번호·호선·블록·품명·수량·ERP CODE·합계. 합계는 참고 정보이며 실제 배정에는 행별 수량만 사용합니다.')
     customer_file = forms.FileField(label='또는 고객 자료 Excel 파일 (.xlsx / .xlsm)', required=False)
     def clean(self):
         data = super().clean()
@@ -64,6 +65,8 @@ class PickingInputForm(forms.Form):
                 from .picking import parse_paste
                 data['pasted_rows'] = parse_paste('\n'.join(f"{r['code']}\t{r['quantity']}" for r in customer))
             data['customer_details'] = customer
+            from .delivery_bridge import validate_handoff
+            data['handoff']=validate_handoff(data.get('bridge_token'),customer,data.get('request_id'))
         except forms.ValidationError as error:
             self.add_error(None,error)
         return data

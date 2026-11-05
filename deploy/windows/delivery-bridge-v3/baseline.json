@@ -1,0 +1,93 @@
+{
+  "release": "SUNIL-ERP-20261104-integrated-v3",
+  "files": [
+    {
+      "path": "config/settings.py",
+      "sha256": "1be44602992c7907f65d55c4fc61e137f9d0fb1e45547edd62d6bdbab9d857e7"
+    },
+    {
+      "path": "config/urls.py",
+      "sha256": "8e0b89a23805e5bb04432f6fdb2f8be206892446d150bbccd768f20c1c2e74ef"
+    },
+    {
+      "path": "inventory/access.py",
+      "sha256": "75e3131cd00bcbc1979832645c37a799e04ed39c0fdcc88797889c4fa86e7583"
+    },
+    {
+      "path": "inventory/customer_picking.py",
+      "sha256": "364374a719777adb45bec7a689d521fb4df17c4e3b9d4bf1a089e2ce042d402b"
+    },
+    {
+      "path": "inventory/delivery_bridge.py",
+      "sha256": null
+    },
+    {
+      "path": "inventory/forms.py",
+      "sha256": "68e30c185fe6c8fb8e51791b0cb0d261d519bfe4ee72377409a216e0eea105c9"
+    },
+    {
+      "path": "inventory/location_planner.py",
+      "sha256": "cc636eba26cc2b2fbac6eeef77072367a8be7d9ba045546fd8be8927c7a7b083"
+    },
+    {
+      "path": "inventory/locking.py",
+      "sha256": "9e598148a738b8bf41e454fcc672c1517959b71449c4b03f83e762f775b9c844"
+    },
+    {
+      "path": "inventory/menu_permissions.py",
+      "sha256": "31378b60b634e476b34e42d3eca63aa7059e23b27ee7269c09370e09f5599bba"
+    },
+    {
+      "path": "inventory/models.py",
+      "sha256": "b871cf5df495a4c46e6548c5d66662be182ee8d083c36f1bd166c9db4540a083"
+    },
+    {
+      "path": "inventory/picking.py",
+      "sha256": "08847e55a1d9b8751fa4ba78d9d05ac4aa1999b1d03e69871c0adca89633a8a7"
+    },
+    {
+      "path": "inventory/picking_totals.py",
+      "sha256": "80dda1137848c47f684a31d49c93c71b1c8c105e00f70b0678c598d4c1a4cadc"
+    },
+    {
+      "path": "inventory/reassignment.py",
+      "sha256": "c1d0ece4fd70f6dffac769cccd8b233e1dd522854284257d9f45a5b63ee634a8"
+    },
+    {
+      "path": "inventory/services.py",
+      "sha256": "a4ef54acbad7dce53c6a09111d7e215bb783df3f27566c423155f17595303b63"
+    },
+    {
+      "path": "inventory/tabular.py",
+      "sha256": "88a34a3b6107bdb43efc11fb82f8f497198f75041532a911dcc83c9cc4c6a9f4"
+    },
+    {
+      "path": "inventory/templates/inventory/base.html",
+      "sha256": "b9bb9c9b7675f02087f4db182dbb20fafe5f5fa4ad9e5d014a2f0247783f8efe"
+    },
+    {
+      "path": "inventory/templates/inventory/delivery_done.html",
+      "sha256": null
+    },
+    {
+      "path": "inventory/templates/inventory/delivery_receiver.html",
+      "sha256": null
+    },
+    {
+      "path": "inventory/templates/inventory/picking_detail.html",
+      "sha256": "b7f791f48230346e62c0da7e7a209405c58d52d08b70ebf2aca48f3db518a2b0"
+    },
+    {
+      "path": "inventory/test_delivery_bridge.py",
+      "sha256": null
+    },
+    {
+      "path": "inventory/views.py",
+      "sha256": "3c61ab7b1b0dcf7e152a08fd32d9be54247dcafbb23f7a81709f0fbd07ba716d"
+    },
+    {
+      "path": "manage.py",
+      "sha256": "ed3b9b4427b735f83b9086979e880c676006a8567df3bbbf37e5f963d5020b37"
+    }
+  ]
+}

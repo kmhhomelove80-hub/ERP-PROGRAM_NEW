@@ -76,7 +76,7 @@ def plan_picking(rows, *, received_only=False, manual=None):
     return {'allocations':allocations,'shortages':shortages}
 
 @warehouse_transaction
-def confirm_picking(*, request_id, project, rows, preview, allow_shortage, actor, customer_rows=None, substitution_draft=False, manual=None):
+def confirm_picking(*, request_id, project, rows, preview, allow_shortage, actor, customer_rows=None, substitution_draft=False, manual=None, handoff=None):
     require_menu_write(actor, 'shipping')
     project = project.strip()
     if not project or len(project)>250: raise ValidationError('프로젝트/호선 이름이 필요합니다.')
@@ -86,14 +86,22 @@ def confirm_picking(*, request_id, project, rows, preview, allow_shortage, actor
     if manual is not None: payload['manual'] = sorted([[int(k), v] for k,v in dict(manual).items()])
     if substitution_draft: payload['substitution_draft']=True
     if customer_rows:
-        from .customer_picking import parse_customer
-        customer_rows = parse_customer(pasted='\n'.join('\t'.join(str(r[k]) for k in ['por','hull','block','name','quantity','code']) for r in customer_rows))
+        from .customer_picking import parse_customer,serialize_customer
+        customer_rows = parse_customer(pasted=serialize_customer(customer_rows))
         customer_totals = parse_paste('\n'.join(f"{r['code']}\t{r['quantity']}" for r in customer_rows))
         if customer_totals != normalized: raise ValidationError('고객 자료와 요청 수량이 일치하지 않습니다.')
         payload['customer_rows'] = customer_rows
+    if handoff:
+        from .delivery_bridge import validate_handoff
+        handoff=validate_handoff(handoff,customer_rows or [],request_id)
+        payload['handoff']=handoff
     previous = PickingOrder.objects.filter(pk=request_id).first()
     if previous:
-        if previous.actor_id != actor.pk or previous.payload != payload:
+        def comparable(value):
+            result={k:v for k,v in value.items() if k!='handoff_result'}
+            if result.get('handoff'):result['handoff']={k:v for k,v in result['handoff'].items() if k!='issued_at'}
+            return result
+        if previous.actor_id != actor.pk or comparable(previous.payload) != comparable(payload):
             raise ValidationError('이미 사용한 요청번호입니다.')
         return previous
     current = plan_picking(normalized, manual=manual)
@@ -102,6 +110,9 @@ def confirm_picking(*, request_id, project, rows, preview, allow_shortage, actor
     if not current['allocations'] and not (substitution_draft and allow_shortage): raise ValidationError('예약 가능한 수량이 없습니다. 전량 부족이면 대체 배정용 주문으로 등록하세요.')
     if current['shortages'] and not allow_shortage:
         raise ValidationError('부족 수량을 확인하고 부분 배정 동의에 체크하세요.')
+    if handoff:
+        from .delivery_bridge import build_reply
+        payload['handoff_result']=build_reply(handoff,customer_rows,current,request_id)
     order = PickingOrder.objects.create(id=request_id,project=project,actor=actor,payload=payload,shortages=current['shortages'])
     for row in current['allocations']:
         stock = Stock.objects.select_for_update().get(pk=row['stock_id'])

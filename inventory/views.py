@@ -1,3 +1,4 @@
+import json
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.exceptions import ValidationError
@@ -88,6 +89,14 @@ def picking_create(request):
     from .picking import plan_picking, confirm_picking
     from .reassignment import parse_targets
     from .picking_totals import picking_totals
+    if request.method == 'GET' and request.GET.get('delivery_id'):
+        from .models import PickingOrder
+        from .delivery_bridge import reply_url
+        try:delivery_id = UUID(request.GET['delivery_id'])
+        except ValueError:delivery_id = None
+        previous = PickingOrder.objects.filter(pk=delivery_id, actor=request.user).first() if delivery_id else None
+        if previous and reply_url(previous):
+            return render(request, 'inventory/delivery_done.html', {'order':previous, 'delivery_reply_url':reply_url(previous)})
     action = request.POST.get('action')
     input_form = PickingInputForm(request.POST if request.method == 'POST' and action == 'preview' else None, request.FILES or None)
     preview, confirm_form, totals, candidates, payload = None, None, None, [], None
@@ -95,7 +104,7 @@ def picking_create(request):
         try:
             if action == 'preview' and input_form.is_valid():
                 d = input_form.cleaned_data
-                payload = dict(actor=request.user.pk,request_id=str(d['request_id']),project=d['project'],rows=d['pasted_rows'],customer_rows=d.get('customer_details',[]))
+                payload = dict(actor=request.user.pk,request_id=str(d['request_id']),project=d['project'],rows=d['pasted_rows'],customer_rows=d.get('customer_details',[]),handoff=d.get('handoff'))
                 try:
                     payload['preview'] = plan_picking(payload['rows'])
                 except ValidationError as error:
@@ -111,7 +120,9 @@ def picking_create(request):
                     raise ValidationError('다른 사용자의 미리보기입니다.')
                 initial = {'request_id':payload['request_id'], 'project':payload['project']}
                 if payload.get('customer_rows'):
-                    initial['customer_rows'] = '\n'.join('\t'.join(str(r[k]) for k in ['por','hull','block','name','quantity','code']) for r in payload['customer_rows'])
+                    from .customer_picking import serialize_customer
+                    initial['customer_rows'] = serialize_customer(payload['customer_rows'])
+                    if payload.get('handoff'):initial['bridge_token'] = json.dumps(payload['handoff'], ensure_ascii=False)
                 else:
                     initial['pasted_rows'] = '\n'.join(f"{r['quantity']}\t{r['code']}" for r in payload['rows'])
                 input_form = PickingInputForm(initial=initial)
@@ -122,8 +133,11 @@ def picking_create(request):
                 else:
                     if payload['preview'] is None:
                         raise ValidationError('수동 위치 배정 미리보기를 먼저 확인하세요.')
-                    order = confirm_picking(request_id=UUID(payload['request_id']),project=payload['project'],rows=payload['rows'],preview=payload['preview'],allow_shortage=form.cleaned_data['allow_shortage'],actor=request.user,customer_rows=payload.get('customer_rows',[]),substitution_draft=request.POST.get('substitution_draft')=='1',manual=payload.get('manual'))
+                    order = confirm_picking(request_id=UUID(payload['request_id']),project=payload['project'],rows=payload['rows'],preview=payload['preview'],allow_shortage=form.cleaned_data['allow_shortage'],actor=request.user,customer_rows=payload.get('customer_rows',[]),substitution_draft=request.POST.get('substitution_draft')=='1',manual=payload.get('manual'),handoff=payload.get('handoff'))
                     messages.success(request,'피킹 예약을 등록했습니다. 재고 차감은 실제 출고 후 Release에서 수행하세요.')
+                    from .delivery_bridge import reply_url
+                    target = reply_url(order)
+                    if target:return render(request, 'inventory/delivery_done.html', {'order':order, 'delivery_reply_url':target})
                     return redirect('picking-detail',pk=order.pk)
         except (signing.BadSignature, ValidationError) as error:
             messages.error(request,' / '.join(error.messages) if isinstance(error,ValidationError) else '미리보기가 만료되었거나 유효하지 않습니다. 다시 계산하세요.')
@@ -146,7 +160,8 @@ def picking_detail(request, pk):
         rows = list(order.allocations.select_related('stock__item','substitution').order_by('stock__item__code','stock__pk'))
         balance = demand_balance(order)
         totals = order_totals(order, rows)
-    return render(request,'inventory/picking_detail.html',{'order':order,'allocations':rows,'balance':balance,'totals':totals})
+    from .delivery_bridge import reply_url
+    return render(request,'inventory/picking_detail.html',{'order':order,'allocations':rows,'balance':balance,'totals':totals,'delivery_reply_url':reply_url(order)})
 
 @menu_access('shipping')
 def allocation_list(request):
