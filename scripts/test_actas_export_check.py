@@ -121,6 +121,27 @@ class PilotTests(unittest.TestCase):
         with patch('sys.argv',['actas_export_check.py']),patch('builtins.print'),patch.object(p,'WindowsActas') as factory:
             self.assertEqual(p.main(),1)
             factory.assert_not_called()
+    def test_staged_export_requires_input_acceptance_before_query(self):
+        adapter=EditBufferFixture();queries=[]
+        adapter.query_committed=lambda warehouse:queries.append(warehouse)
+        wrapper=p.OperatorCheckedExport(adapter,lambda warehouse:True,lambda warehouse:False)
+        with self.assertRaisesRegex(RuntimeError,'조회하지 않았습니다'):wrapper.select_and_query('Y09')
+        self.assertEqual(adapter.committed,'Y09');self.assertEqual(queries,[])
+    def test_staged_export_uses_verified_keyboard_path_and_records_operator(self):
+        adapter=EditBufferFixture();events=[]
+        adapter.query_committed=lambda warehouse:events.append(('query',warehouse,adapter.committed))
+        def accept(warehouse):
+            self.assertEqual(events,[]);self.assertEqual(adapter.committed,warehouse);return True
+        wrapper=p.OperatorCheckedExport(adapter,lambda warehouse:True,accept)
+        evidence=wrapper.select_and_query('Y09')
+        self.assertEqual(events,[('query','Y09','Y09')])
+        self.assertEqual(evidence['warehouse_name_confirmed_by'],'operator')
+        self.assertTrue(evidence['query_sent']);self.assertFalse(evidence['warehouse_name_verified'])
+    def test_staged_cancel_prepare_does_not_change_code(self):
+        adapter=EditBufferFixture()
+        wrapper=p.OperatorCheckedExport(adapter,lambda warehouse:False,lambda warehouse:True)
+        with self.assertRaises(RuntimeError):wrapper.select_and_query('Y09')
+        self.assertEqual(adapter.keys,[])
     def test_duplicate_codes_bad_quantities_and_wrong_format_rejected(self):
         for raw in (b'partial', data()+data().split(b'\r\n',1)[1],data(quantity='NaN'),data(quantity='1e-999999')):
             with self.subTest(raw=raw),self.assertRaises(RuntimeError):p.inspect_export(raw)

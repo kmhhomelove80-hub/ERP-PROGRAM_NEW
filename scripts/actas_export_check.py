@@ -1,8 +1,8 @@
-"""Actas warehouse INPUT probe. CLI does not query, export or import.
+"""Actas staged warehouse/query/export pilot; never imports into SUNIL.
 
-Real key input + Tab/Shift+Tab checks replace WM_SETTEXT-only warehouse writes.
-Legacy export helpers are retained for tests; the batch CLI is disabled pending
-onsite validation. No direct database/config/credential access.
+Input-only mode remains available. Checked export mode requires operator
+warehouse-name acceptance before query and query-completion acceptance before
+saving. No automatic query-completion or warehouse-name claim; no DB access.
 """
 import argparse
 from contextlib import contextmanager
@@ -182,7 +182,7 @@ def run_check(adapter, root, confirm, progress=print, reader=wait_file):
     root.mkdir(parents=True, exist_ok=True)
     run = root / uuid.uuid4().hex
     run.mkdir()
-    report = {'format': 3, 'pilot_version': 3, 'kind': 'Actas-export-pilot-NOT-import', 'started_at': now(),
+    report = {'format': 3, 'pilot_version': getattr(adapter, 'pilot_version', 3), 'kind': 'Actas-export-pilot-NOT-import', 'started_at': now(),
               'phase': 'running', 'files': {}, 'registered_in_sunil': False,
               'automatic_query_completion_verified': False, 'warehouse_transition_verified': False}
     save_json(run / 'result.json', report)
@@ -192,7 +192,10 @@ def run_check(adapter, root, confirm, progress=print, reader=wait_file):
             report.update(phase='selecting_' + warehouse)
             save_json(run / 'result.json', report)
             progress(warehouse + ' 입력 확인 및 조회 단축키 전송')
-            adapter.select_and_query(warehouse)
+            evidence = adapter.select_and_query(warehouse)
+            if evidence is not None:
+                report.setdefault('input_evidence', {})[warehouse] = evidence
+                report['pilot_version'] = 4
             report.update(phase='awaiting_operator_' + warehouse)
             save_json(run / 'result.json', report)
             if not confirm(warehouse):raise RuntimeError('담당자가 검증을 중단했습니다.')
@@ -458,6 +461,13 @@ class WindowsActas:
         self.shortcut('query')
         return evidence
 
+    def query_committed(self, warehouse):
+        self.preflight()
+        self.activate(self.editor, self.main)
+        if self.focus_state()[0] != self.editor or self.read_edit(self.editor).strip() != warehouse:
+            raise RuntimeError('조회 직전 창고 코드가 달라 중단했습니다.')
+        self.shortcut('query')
+
     def save_export(self, path):
         self.activate(self.stock, self.main)
         self.shortcut('export')
@@ -525,13 +535,67 @@ def probe_input(adapter, root, warehouse, *, delay=12, progress=print):
         raise
 
 
+class OperatorCheckedExport:
+    """Require visual warehouse acceptance before query and again before export."""
+    pilot_version = 4
+    def __init__(self, adapter, prepare, accept_input):
+        self.adapter, self.prepare, self.accept_input = adapter, prepare, accept_input
+    def preflight(self):self.adapter.preflight()
+    def select_and_query(self, warehouse):
+        if not self.prepare(warehouse):raise RuntimeError('창고 선택 준비를 중단했습니다.')
+        self.adapter.preflight()
+        evidence = self.adapter.enter_warehouse(warehouse, already_selected=True)
+        if not self.accept_input(warehouse):raise RuntimeError('창고 코드·명칭 확인을 중단했습니다. 조회하지 않았습니다.')
+        self.adapter.query_committed(warehouse)
+        evidence.update(query_sent=True, warehouse_name_confirmed_by='operator', input_confirmed_at=now())
+        return evidence
+    def save_export(self, path):self.adapter.save_export(path)
+
+
+def prepare_export_input(warehouse):
+    if not confirm_token('READY', f'{warehouse} 입력 준비입니다. ready 입력 후 12초 안에 Actas 창고 코드 칸을 클릭하세요. 중단은 Enter: '):return False
+    print('12초 안에 창고 코드 칸을 클릭하고 손을 떼세요.', flush=True)
+    time.sleep(12)
+    return True
+
+
+def export_main(root):
+    print('Y02 영주본사·Y09 부산창고 조회/파일 저장 시험입니다. SUNIL 등록은 하지 않습니다.')
+    print('검색어·분류 필터를 전체로 두고 Actas 저장창을 닫으세요. 다른 사용자는 Actas를 조작하지 마세요.')
+    if not confirm_token('START', '시작은 start, 중단은 Enter: '):return 1
+    def accept_input(warehouse):
+        name = '영주제품창고' if warehouse == 'Y02' else '부산창고'
+        print(f'Actas 코드 {warehouse}와 오른쪽 창고명 {name}를 직접 확인하세요. 아직 조회하지 않았습니다.', flush=True)
+        return confirm_token(warehouse + ' INPUT', f'일치하면 {warehouse} input, 중단은 Enter: ')
+    def accept_query(warehouse):
+        print(f'Actas에서 {warehouse} 코드·창고명이 유지되고 재고 표가 새로 조회됐는지 확인하세요.', flush=True)
+        print('아직 조회 중이거나 이전 표라면 확인을 입력하지 마세요. 확인 전에는 저장하지 않습니다.', flush=True)
+        return confirm_token(warehouse, f'조회 완료 확인은 {warehouse}, 중단은 Enter: ')
+    try:
+        with single_pilot():
+            adapter = OperatorCheckedExport(WindowsActas(), prepare_export_input, accept_input)
+            folder, report = run_check(adapter, root, accept_query, progress=lambda message: print(message, flush=True))
+        print('두 파일의 형식 검사가 끝났습니다. 창고/조회는 담당자가 확인했으며 자동 판독이 아닙니다.')
+        print('SUNIL ERP에는 등록하지 않았습니다. result.json과 두 XLS 파일을 전달하세요.')
+        print('결과:', folder / 'result.json')
+        return 0
+    except Exception as error:
+        print('조회/저장 검증 중단:', str(error))
+        print('위 중단 기록을 전달하세요. 자동 재시도하지 않습니다.')
+        return 1
+
+
 def main():
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, 'reconfigure'):stream.reconfigure(encoding='utf-8', errors='replace')
     parser = argparse.ArgumentParser(description='Actas 창고 입력 확정만 검증 · 조회/추출/등록 없음')
     parser.add_argument('--output-root', type=Path, default=Path(__file__).resolve().parent / 'runs')
-    parser.add_argument('--probe-warehouse', choices=('Y02', 'Y09'))
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--probe-warehouse', choices=('Y02', 'Y09'))
+    mode.add_argument('--export-checked', action='store_true')
     args = parser.parse_args()
+    if args.export_checked:
+        return export_main(args.output_root)
     if not args.probe_warehouse:
         print('일괄 조회/추출은 중지된 검증본입니다. --probe-warehouse Y09로 입력 확정부터 확인하세요.')
         return 1
