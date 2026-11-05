@@ -1,0 +1,35 @@
+{
+  "success": true,
+  "windows_native_success": true,
+  "windows_schedule_restore_success": true,
+  "postgresql18_success": true,
+  "browser_success": true,
+  "commit": "749633ab3b345ef8ac8adf9d7d92c8b495f66217",
+  "workflow_run": 42036802738,
+  "url": "https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/actions/runs/42036802738",
+  "jobs": [
+    {
+      "id": 127276955567,
+      "name": "postgresql18",
+      "conclusion": "success"
+    },
+    {
+      "id": 127276955587,
+      "name": "windows-python312",
+      "conclusion": "success"
+    },
+    {
+      "id": 127276955892,
+      "name": "browser",
+      "conclusion": "success"
+    }
+  ],
+  "local_unit_tests": 303,
+  "local_updater_tests": 23,
+  "package_apply_restore": [
+    "integrated-v3",
+    "bridge-v1"
+  ],
+  "actual_erp_paste": "현장 확인 필요",
+  "actas_scheduler": "별도 현장 검증 대기; 이 배포에서 활성화하지 않음"
+}
