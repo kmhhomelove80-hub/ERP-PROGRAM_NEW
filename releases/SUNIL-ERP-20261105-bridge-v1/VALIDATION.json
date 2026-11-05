@@ -1,0 +1,27 @@
+{
+  "success": true,
+  "windows_native_success": true,
+  "windows_schedule_restore_success": true,
+  "postgresql18_success": true,
+  "browser_success": true,
+  "commit": "dfcf6cdf38d0b2e226996a53de7b0871c7397939",
+  "integrated_run": 41953263760,
+  "erp_run": 41953263601,
+  "jobs": [
+    {
+      "id": 127001973719,
+      "name": "postgresql18",
+      "conclusion": "success"
+    },
+    {
+      "id": 127001974167,
+      "name": "windows-python312",
+      "conclusion": "success"
+    },
+    {
+      "id": 127001974233,
+      "name": "browser",
+      "conclusion": "success"
+    }
+  ]
+}
