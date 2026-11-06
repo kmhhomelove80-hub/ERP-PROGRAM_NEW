@@ -96,3 +96,5 @@
 @media screen{nav.auto-scroll-ready{min-height:1px!important}#production-capture:not(:has(#plan-selected tbody tr)){display:none}.compact-intro-help{margin:3px 0;font-size:12px}.compact-intro-help summary{cursor:pointer}.compact-intro-help p{padding:4px 8px}.page-title .compact-intro-help{margin-left:auto}}
 
 @media screen{.compact-edit{margin:4px 0;font-size:13px}.compact-edit>summary{cursor:pointer;padding:4px}.compact-preview-confirm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 10px;margin:5px 0}.compact-preview-confirm p,.compact-preview-confirm label{display:inline-flex;align-items:center;gap:6px;margin:0;font-size:13px}.compact-preview-confirm button{margin-left:auto}.compact-preview-confirm .errorlist{flex-basis:100%}}
+@media screen{#inbound-tool.inbound-tool .upload .filelabel,#inbound-tool.inbound-tool .upload button{display:inline-flex;align-items:center;justify-content:center;font-size:14px;line-height:20px;padding:8px 12px;min-height:36px}}
+@media screen and (max-width:900px){#inbound-tool.inbound-tool .upload .filelabel,#inbound-tool.inbound-tool .upload button{min-height:44px}}

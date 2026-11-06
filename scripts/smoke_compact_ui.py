@@ -44,7 +44,7 @@ Allocation.objects.bulk_create([Allocation(stock=s,quantity=1,project='LONG',leg
     assert page.locator('[name=shipped_at]').input_value()
     page.screenshot(path=str(OUT/f'allocations-{width}.png'),full_page=True)
     page.locator('[name=shipped_at]').fill('2026-01-01T09:00');page.evaluate("document.dispatchEvent(new Event('allocation-time-refresh'))");assert page.locator('[name=shipped_at]').input_value()=='2026-01-01T09:00'
-   page.set_viewport_size({'width':1440,'height':1000});page.goto(base+'/inbound/');a=page.locator('.filelabel').bounding_box();b=page.locator('#inbound-sample').bounding_box();assert b['x']-a['x']-a['width']>=8,(a,b)
+   page.set_viewport_size({'width':1440,'height':1000});page.goto(base+'/inbound/');a=page.locator('.filelabel').bounding_box();b=page.locator('#inbound-sample').bounding_box();assert b['x']-a['x']-a['width']>=8,(a,b);assert abs(a['height']-b['height'])<=1,(a,b)
    page.goto(base+'/stocktake/');page.locator('[name=q]').fill('COUNT');page.locator('[name=confirmed]').check();page.get_by_role('button',name='재고 실사 리스트 출력 / 다운로드 준비').click();page.wait_for_url('**/stocktake/*/');detail=page.url
    with page.expect_download() as download:page.get_by_role('link',name='조사 엑셀 다운로드').click()
    path=Path(tmp)/'count.xlsx';download.value.save_as(path);book=load_workbook(path);sheet=book.active;assert sheet['P2'].value==11 and sheet['Q2'].value==4;sheet['M2']=10;sheet['N2']='실사 부족 확인';sheet.append(['NEW','가상 신규 제품','가상 신규 규격','Y09','NEW-LOC','입고 완료',None,None,None,None,None,None,3,'실사 중 발견']);book.save(path)
