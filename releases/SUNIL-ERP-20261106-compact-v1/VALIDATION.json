@@ -1,0 +1,69 @@
+{
+  "success": true,
+  "windows_native_success": true,
+  "windows_schedule_restore_success": true,
+  "postgresql18_success": true,
+  "browser_success": true,
+  "commit": "a02982e4135a9008ab4670c31c9b2c5bbccc768b",
+  "workflow_run": 42172945462,
+  "url": "https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/actions/runs/42172945462",
+  "jobs": [
+    {
+      "id": 127744763921,
+      "name": "postgresql18",
+      "conclusion": "success"
+    },
+    {
+      "id": 127744764135,
+      "name": "windows-python312",
+      "conclusion": "success"
+    },
+    {
+      "id": 127744764271,
+      "name": "browser",
+      "conclusion": "success"
+    }
+  ],
+  "source_payload_helpers_verified": 84,
+  "package_apply_restore": [
+    "integrated-v3",
+    "bridge-v1",
+    "inbound-v1",
+    "stocktake-v1",
+    "receive-v1"
+  ],
+  "layout_measurements": [
+    {
+      "viewport": [
+        1920,
+        1080
+      ],
+      "header_height": 52,
+      "table_top": 220.89,
+      "table_height": 841,
+      "table_fraction": 0.779
+    },
+    {
+      "viewport": [
+        1366,
+        768
+      ],
+      "header_height": 52,
+      "table_top": 220.89,
+      "table_height": 529,
+      "table_fraction": 0.689
+    }
+  ],
+  "checks": [
+    "toolbar_above_table",
+    "horizontal_extension_menu",
+    "upload_button_gap_and_height",
+    "auto_load_without_click",
+    "network_failure_retry_only",
+    "server_submit_time_default",
+    "manual_time_preserved",
+    "mobile",
+    "existing_receipt_stocktake_production_regressions"
+  ],
+  "private_data_in_release": false
+}
