@@ -7,3 +7,10 @@ let clip=I.clipboard(rows);assert.equal(clip.text.split('\r\n')[0],'001\t제품\
 rows[0].split='31+32';assert.throws(()=>I.clipboard(rows),/분할 합계/);
 const raw=grid.map(r=>Array(9).fill('').concat(r));raw[0][0]='check code1';raw[1][7]='16+48';assert.equal(I.parseGrid(raw).rows[0].split,'16+48');
 console.log('입고 변환·정확한 분할·삭제 합계·비고 보호·5열 복사 검사 완료');
+for(const [raw,expected] of [['6.',6],['3.',3],['1,200.',1200],['0.50',.5],['6.000',6]]) {
+ const row=I.parseGrid([['품목코드','품목명','규격','수량','비고'],['FIXTURE','가상 품목','가상 규격',raw,'']]).rows[0];assert.equal(I.output([row])[0].qty,expected);
+}
+const dotted=I.parseGrid([['품목코드','품목명','규격','수량','비고'],['FIXTURE','가상 품목','가상 규격','64.','32.+32.']]).rows;
+assert.deepEqual(I.output(dotted).map(r=>r.qty),[32,32]);
+for(const raw of ['.','0.','-3.','6..','6.a','1.1234567890123'])assert.throws(()=>I.parseGrid([['품목코드','품목명','규격','수량'],['FIXTURE','가상 품목','가상 규격',raw]]));
+console.log('ERP 끝자리 소수점·쉼표·분할 수량 및 잘못된 수량 검사 완료');

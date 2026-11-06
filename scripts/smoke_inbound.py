@@ -53,13 +53,26 @@ Allocation.objects.create(stock=s,project='OTHER',quantity=999)
    page.locator('#select-page').check();assert int(page.locator('#processing-quantity').inner_text().replace(',',''))==page.locator('[name=allocations]').evaluate_all('(els)=>els.reduce((s,e)=>s+Number(e.dataset.quantity),0)')
    page.locator('[name=scope][value=filtered]').check();expect(page.locator('#processing-quantity')).to_have_text('1,540')
    page.goto(base+'/inbound/');assert page.locator('.mobile-bottom-nav').count()==0
-   text='품목코드\t품목명\t규격\t수량\t비고\n001\t가상 제품\tD값\t64\t32+32\n품목별 합계\t\t\t64\n001\t다른 제품\t규격 둘\t12\t\n전체 합계\t\t\t76'
+   text='품목코드\t품목명\t규격\t수량\t비고\n001\t가상 제품\tD값\t64.\t32+32\n품목별 합계\t\t\t64\n001\t다른 제품\t규격 둘\t12.\t\n전체 합계\t\t\t76'
    upload_counter=[0]
    def upload(name,data):
     upload_counter[0]+=1;name=str(upload_counter[0])+'-'+name
     page.locator('#inbound-file').set_input_files({'name':name,'mimeType':'application/octet-stream','buffer':data})
     expect(page.locator('#inbound-filename')).to_contain_text(name)
     expect(page.locator('#inbound-totalQty')).to_have_text('76');expect(page.locator('#inbound-locationStatus')).to_contain_text('확인 완료')
+   private=os.environ.get('ERP_PRIVATE_INBOUND_FIXTURE')
+   if private:
+    import csv,io
+    from decimal import Decimal
+    content=Path(private).read_bytes();source=list(csv.reader(io.StringIO(content.decode('cp949')),delimiter='\t'));header=source[0];q=header.index('수량');code=header.index('품목코드')
+    detail=[r for r in source[1:] if len(r)>q and r[code] and not any(word in r[code] for word in ('합계','소계','총계'))]
+    total=sum(Decimal(r[q].replace(',','')) for r in detail)
+    page.locator('#inbound-file').set_input_files({'name':'private-fixture.xls','mimeType':'application/octet-stream','buffer':content})
+    expect(page.locator('#inbound-filename')).to_contain_text('private-fixture.xls')
+    expect(page.locator('#inbound-editBody tr')).to_have_count(len(detail))
+    assert Decimal(page.locator('#inbound-totalQty').inner_text().replace(',',''))==total
+    assert not page.locator('#inbound-msg').inner_text()
+    print('PASS: 비공개 첨부 파일 전체 상세 행·수량·분할 브라우저 검증')
    for encoding in ('cp949','utf-8'):
     upload('fixture.xls',text.encode(encoding));expect(page.locator('#inbound-rowCount')).to_have_text('3')
    page.locator('#inbound-applyLocations').click();page.locator('#inbound-previewTab').click();expect(page.locator('.rowNote').first).to_have_value('A01')
@@ -81,7 +94,7 @@ Allocation.objects.create(stock=s,project='OTHER',quantity=999)
    doc=fitz.open(OUT/'sample.pdf');assert abs(doc[0].rect.width-595.3)<2 and abs(doc[0].rect.height-841.9)<2;printed=''.join(p.get_text() for p in doc);assert '총수량' in printed and 'D값' not in printed
    page.emulate_media(media='screen');page.locator('#inbound-editTab').click();page.locator('.split').first.fill('31+32');expect(page.locator('#inbound-print')).to_be_disabled();expect(page.locator('#inbound-copyERP')).to_be_disabled();expect(page.locator('#inbound-download')).to_be_disabled()
    page.emulate_media(media='print');assert page.locator('#inbound-preview').is_hidden();page.emulate_media(media='screen')
-   many='품목코드\t품목명\t규격\t수량\t비고\n'+'\n'.join(f'001\t가상 제품 {i}\t인쇄제외규격\t64\t32+32' for i in range(40))
+   many='품목코드\t품목명\t규격\t수량\t비고\n'+'\n'.join(f'001\t가상 제품 {i}\t인쇄제외규격\t64.\t32+32' for i in range(40))
    page.locator('#inbound-file').set_input_files({'name':'multi.xls','mimeType':'application/octet-stream','buffer':many.encode()});expect(page.locator('#inbound-rowCount')).to_have_text('80');page.locator('#inbound-previewTab').click();page.emulate_media(media='print');page.pdf(path=str(OUT/'multipage.pdf'),prefer_css_page_size=True,print_background=True)
    doc=fitz.open(OUT/'multipage.pdf');assert len(doc)>1
    for pdfpage in doc:assert '품목코드' in pdfpage.get_text() and '총수량' in pdfpage.get_text() and '인쇄제외규격' not in pdfpage.get_text()

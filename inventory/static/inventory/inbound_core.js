@@ -5,7 +5,7 @@ const clean=v=>String(v??'').trim();const SCALE=1000000000000n;
 function units(value){
  let text=clean(value).replaceAll(',','');
  if(typeof value==='number'&&/e/i.test(text))text=value.toLocaleString('en-US',{useGrouping:false,maximumFractionDigits:12});
- if(!/^\d+(?:\.\d{1,12})?$/.test(text))throw Error('수량은 소수 12자리 이내의 양수여야 합니다.');
+ if(!/^\d+(?:\.\d{0,12})?$/.test(text))throw Error('수량은 소수 12자리 이내의 양수여야 합니다.');
  const [integer,fraction='']=text.split('.');const amount=BigInt(integer)*SCALE+BigInt(fraction.padEnd(12,'0'));
  if(amount<=0n||amount>BigInt(Number.MAX_SAFE_INTEGER)*SCALE)throw Error('수량이 허용 범위를 벗어났습니다.');
  return amount;
