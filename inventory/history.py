@@ -1,5 +1,14 @@
 def event_summary(event):
     d = event.detail
+    if event.action=='inbound_work_edit':
+        return ' / '.join(f"{r.get('line')}행 · {r.get('location') or '미입력'} · "+('배치 완료' if r.get('placed') else '배치 미완료') for r in d.get('after',[]))
+    if event.action in ('inbound_work_create','inbound_work_receive'):return f"{d.get('count',0)}행"+(f" · 총 {d['quantity']}개" if 'quantity' in d else '')
+    if event.action in ('inbound_work_hide','inbound_work_restore'):return '저장 목록 표시만 변경 · 실제 재고 유지'
+    if event.action=='company_print_queue':return f"{d.get('copies',1)}부 · 인쇄 대기"
+    if event.action=='company_print_result':return {'submitted':'인쇄 대기열 전달','unknown':'현장 결과 확인 필요'}.get(d.get('state'),'확인 필요')
+    if event.action=='company_print_cancel':return '대기 상태의 인쇄 요청 취소'
+    if event.action=='company_printer_settings':return '출력 허용' if d.get('enabled') else '출력 중지'
+
     if event.action=='stocktake_apply':return f"실사·조정 {d.get('rows',0)}행 / 증감 {d.get('delta',0)} / 검증 백업 후 반영"
     if event.action=='stocktake_reverse':return f"실사·조정 {d.get('rows',0)}행 되돌리기"
     if event.action=='cleanup_keep':return f"{d.get('source_location','')} → {d.get('destination','')} · 기존 유지"

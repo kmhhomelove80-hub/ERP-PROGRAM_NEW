@@ -226,6 +226,7 @@ class EmployeeMenuAccess(models.Model):
         READ = 'read', '조회만 가능'
         FULL = 'full', '모두 가능'
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='menu_access')
+    inbound_record = models.BooleanField('입고 LIST 배치 기록', default=False)
     receiving = models.CharField('입고 관리', max_length=4, choices=Level.choices, default=Level.READ)
     shipping = models.CharField('출고 관리', max_length=4, choices=Level.choices, default=Level.READ)
     production = models.CharField('생산계획조회', max_length=4, choices=Level.choices, default=Level.READ)
@@ -264,3 +265,57 @@ class StocktakeSession(models.Model):
     after_state = models.JSONField(default=dict)
     reversed_at = models.DateTimeField(null=True, blank=True)
     reversed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name='stocktake_reversals')
+
+class InboundWorkList(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    request_id = models.UUIDField(unique=True)
+    digest = models.CharField(max_length=64)
+    title = models.CharField(max_length=250)
+    document_date = models.DateField()
+    state = models.CharField(max_length=12, default='open', choices=[('open','작업 중'),('received','입고 완료')])
+    archived = models.BooleanField(default=False)
+    revision = models.PositiveBigIntegerField(default=1)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='inbound_lists')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    received_at = models.DateTimeField(null=True, blank=True)
+    received_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name='inbound_confirmations')
+
+class InboundWorkRow(models.Model):
+    work_list = models.ForeignKey(InboundWorkList, on_delete=models.PROTECT, related_name='rows')
+    line = models.PositiveIntegerField()
+    code = models.CharField(max_length=100)
+    name = models.CharField(max_length=250, blank=True)
+    specification = models.TextField(blank=True)
+    quantity = models.CharField(max_length=40)
+    location = models.CharField(max_length=150, blank=True)
+    recommended = models.CharField(max_length=150, blank=True)
+    placed = models.BooleanField(default=False)
+    version = models.PositiveBigIntegerField(default=1)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True)
+    updated_at = models.DateTimeField(null=True, blank=True)
+    class Meta:
+        ordering = ['line']
+        constraints = [models.UniqueConstraint(fields=['work_list','line'], name='unique_inbound_work_line')]
+
+class CompanyPrinter(models.Model):
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    name = models.CharField(max_length=250, blank=True)
+    enabled = models.BooleanField(default=False)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+class CompanyPrintJob(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    request_id = models.UUIDField(unique=True)
+    order = models.ForeignKey(PickingOrder, on_delete=models.PROTECT)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    printer = models.CharField(max_length=250)
+    copies = models.PositiveSmallIntegerField(default=1)
+    document = models.JSONField()
+    state = models.CharField(max_length=12, default='queued', choices=[('queued','대기'),('sending','전송 중·결과 확인 필요'),('submitted','인쇄 대기열 전달'),('unknown','결과 확인 필요'),('cancelled','취소')])
+    created_at = models.DateTimeField(auto_now_add=True)
+    claimed_at = models.DateTimeField(null=True, blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    result = models.TextField(blank=True)
+    claim_id = models.UUIDField(null=True, blank=True)

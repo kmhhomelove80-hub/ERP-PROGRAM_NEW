@@ -180,6 +180,12 @@ def allocation_list(request):
           .order_by('-allocation_order_seq','-order__created_at','-order_id','project','stock__item__code','stock__location','pk'))
     if query: rows=rows.filter(project__icontains=query)
     if seq: rows=rows.filter(Q(legacy_seq__icontains=seq)|Q(order__id__icontains=seq))
+    from .allocation_filters import annotated,parse as parse_filters,apply as apply_filters,summary as filter_summary
+    try: filters=parse_filters(request.GET)
+    except ValidationError as error:
+        from django.http import HttpResponseBadRequest
+        return HttpResponseBadRequest(' / '.join(error.messages))
+    rows=apply_filters(annotated(rows),filters)
     selection_data=request.POST.copy() if request.method=='POST' else None
     if selection_data is not None and 'selected_json' in selection_data:
         import json
@@ -201,7 +207,7 @@ def allocation_list(request):
                 payload = None
                 if request.POST.get('filter_token') or request.POST.get('scope') == 'filtered':
                     payload=signing.loads(request.POST.get('filter_token',''),salt='allocation-filter',max_age=1800)
-                    if payload['actor']!=request.user.pk or payload['q']!=query or payload['seq']!=seq:
+                    if payload['actor']!=request.user.pk or payload['q']!=query or payload['seq']!=seq or payload.get('filters',{})!=filters:
                         raise ValidationError('필터가 변경되었습니다. 다시 조회하세요.')
                 if request.POST.get('scope')=='filtered':
                     ids=payload['ids']
@@ -221,12 +227,12 @@ def allocation_list(request):
             messages.success(request,f'{len(ids)}개 예약 행을 처리했습니다.')
             from django.urls import reverse
             from urllib.parse import urlencode
-            return redirect(reverse('allocation-list')+'?'+urlencode({'q':query,'seq':seq}))
+            return redirect(reverse('allocation-list')+'?'+request.GET.urlencode())
     versions = {str(pk):[stock_id,quantity] for pk,stock_id,quantity in rows.values_list('pk','stock_id','quantity')}
     ids=list(versions)
-    token=signing.dumps(dict(actor=request.user.pk,q=query,seq=seq,ids=ids,versions=versions),salt='allocation-filter',compress=True)
-    page=Paginator(rows,max(1,len(ids)) if (query or seq) and len(ids)<=2000 else 50).get_page(1 if (query or seq) and len(ids)<=2000 else request.GET.get('page'))
-    return render(request,'inventory/allocations.html',{'form':form,'allocations':page,'page_obj':page,'query':query,'seq':seq,'total':len(ids),'filtered_quantity':sum(v[1] for v in versions.values()),'filter_token':token,'selected_ids':selection_data.getlist('allocations') if selection_data is not None else [],'all_visible':bool(query or seq) and len(ids)<=2000})
+    token=signing.dumps(dict(actor=request.user.pk,q=query,seq=seq,filters=filters,ids=ids,versions=versions),salt='allocation-filter',compress=True)
+    page=Paginator(rows,max(1,len(ids)) if (query or seq or filters) and len(ids)<=2000 else 50).get_page(1 if (query or seq or filters) and len(ids)<=2000 else request.GET.get('page'))
+    return render(request,'inventory/allocations.html',{'form':form,'allocations':page,'page_obj':page,'query':query,'seq':seq,'total':len(ids),'filtered_quantity':sum(v[1] for v in versions.values()),'filter_token':token,'selected_ids':selection_data.getlist('allocations') if selection_data is not None else [],'column_filters':filters,'filter_summary':filter_summary(filters),'all_visible':bool(query or seq or filters) and len(ids)<=2000})
 
 @login_required
 def movement_create(request, pk):

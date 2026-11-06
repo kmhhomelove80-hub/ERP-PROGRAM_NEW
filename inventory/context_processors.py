@@ -7,7 +7,9 @@ def business_access(request):
     if rights['inventory']:
         from .models import MovementRequest
         pending = MovementRequest.objects.filter(state='pending').count()
+    from .inbound_work import can_record
     return {
+        'can_record_inbound':can_record(request.user),
         'menu_permissions': rights,
         'can_write_current': rights.get(getattr(request, 'business_menu', ''), False),
         'read_only_employee': not any(rights.values()),

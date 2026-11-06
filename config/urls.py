@@ -1,3 +1,8 @@
+from inventory import company_print_views
+from inventory import allocation_filters
+from inventory.access import menu_access
+from django.views.decorators.http import require_GET
+from inventory import inbound_work_views
 from inventory import cleanup_views
 from inventory import stocktake_views
 from django.contrib import admin
@@ -6,6 +11,13 @@ from django.urls import path
 from inventory import views, production_views, inbound_views
 from .auth_views import WarehouseLoginView
 urlpatterns = [
+    path('company-print/',company_print_views.jobs,name='company-print-jobs'),
+    path('company-print/settings/',company_print_views.settings,name='company-printer-settings'),
+    path('picking/<uuid:pk>/company-print/',company_print_views.order_print,name='company-print-preview'),
+    path('allocations/options/',menu_access('shipping')(require_GET(allocation_filters.options)),name='allocation-options'),
+    path('inbound/saved/',inbound_work_views.index,name='inbound-work-index'),
+    path('inbound/saved/<uuid:pk>/',inbound_work_views.detail,name='inbound-work-detail'),
+    path('inbound/saved/<uuid:pk>/row/',inbound_work_views.save_row,name='inbound-work-save-row'),
     path('stocktake/',stocktake_views.index,name='stocktake-index'),
     path('stocktake/adjust/',stocktake_views.adjust,name='stocktake-adjust'),
     path('stocktake/<uuid:pk>/',stocktake_views.detail,name='stocktake-detail'),

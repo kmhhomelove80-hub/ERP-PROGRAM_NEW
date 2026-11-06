@@ -70,7 +70,8 @@ class PickingTests(TestCase):
         self.assertEqual(response.status_code,302)
         detail = self.client.get(response.url)
         self.assertContains(detail,'호선1')
-        self.assertContains(detail,'인쇄 / PDF로 저장')
+        self.assertContains(detail,'이 PC에서 인쇄 / PDF')
+        self.assertContains(detail,'회사 프린터로 출력')
     def test_other_user_cannot_confirm_preview(self):
         self.client.force_login(self.user)
         token = signing.dumps(dict(actor=self.user.pk+100),salt='picking-preview')

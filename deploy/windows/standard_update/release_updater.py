@@ -22,7 +22,7 @@ import uuid
 VAULT_COMMAND = "$c=Get-Content -LiteralPath $env:SUNIL_CONFIG_PATH -Raw|ConvertFrom-Json; $v=Import-Clixml -LiteralPath $c.SecretsPath; $s=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value; if($v.OwnerSid -ne $s){throw 'Run as the original secret owner'}; $r=@{sid=$s}; foreach($n in @('ERP_SECRET_KEY','ERP_DB_PASSWORD')){$r[$n]=[Management.Automation.PSCredential]::new('unused',$v.Secrets[$n]).GetNetworkCredential().Password}; $r|ConvertTo-Json -Compress"
 
 TERMINAL = {'complete', 'rolled_back', 'no_changes'}
-ALLOWED_MIGRATIONS = {('inventory', '0012_production_plan'), ('inventory', '0013_employee_menu_access'), ('inventory', '0014_stocktake_and_cleanup')}
+ALLOWED_MIGRATIONS = {('inventory', '0012_production_plan'), ('inventory', '0013_employee_menu_access'), ('inventory', '0014_stocktake_and_cleanup'), ('inventory', '0015_inbound_work_and_company_print')}
 
 
 def digest(path):
@@ -104,7 +104,7 @@ def exclusive_lock(path):
 
 
 def validate_payload(release, app, manifest, installed=True):
-    if manifest.get('format') != 3 or manifest.get('target_migration') not in ('0013_employee_menu_access','0014_stocktake_and_cleanup'):
+    if manifest.get('format') != 3 or manifest.get('target_migration') not in ('0013_employee_menu_access','0014_stocktake_and_cleanup','0015_inbound_work_and_company_print'):
         raise RuntimeError('이 업데이트의 배포 명세가 아닙니다.')
     expected_helpers = {'Update-Erp.py', 'release_updater.py', 'release_probe.py', 'update_snapshot.py'}
     if set(manifest.get('helpers', {})) != expected_helpers:
@@ -338,6 +338,7 @@ class WindowsOps:
         self.web_candidates=list(dict.fromkeys([*self.web_candidates,'http://127.0.0.1:8080']))
         self.web=self.web_candidates[0]
         if not recovery:
+            self.ps("$t=Get-ScheduledTask -TaskName 'SUNIL-Company-Printer' -ErrorAction SilentlyContinue; if($t -and ($t.Settings.Enabled -or [string]$t.State -eq 'Running')){throw 'Pause and disable SUNIL-Company-Printer before updating'}")
             profile=self.probe('profile')
             if (profile['vendor'],profile['name'],profile['user']) != ('postgresql','sunil','sunil'): raise RuntimeError('기존 PostgreSQL sunil DB/사용자가 아닙니다.')
             if profile['host'] not in ('localhost','127.0.0.1','::1',''): raise RuntimeError('이 배포는 기존 로컬 PostgreSQL 서버용입니다. 외부 DB는 변경하지 않습니다.')
@@ -483,7 +484,7 @@ class WindowsOps:
     def migrate(self):
         plan=self.probe('plan')
         if any(backwards or (app,name) not in ALLOWED_MIGRATIONS for app,name,backwards in plan):
-            raise RuntimeError('0012·0013·0014 외의 예상하지 않은 마이그레이션이 있습니다. DB 변경을 시작하지 않습니다.')
+            raise RuntimeError('0012·0013·0014·0015 외의 예상하지 않은 마이그레이션이 있습니다. DB 변경을 시작하지 않습니다.')
         self.command([sys.executable,'manage.py','migrate','--noinput'],'migrate',600)
 
     def validate(self,old=False):

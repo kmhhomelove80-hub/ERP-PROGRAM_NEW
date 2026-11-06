@@ -21,6 +21,7 @@ jobs:
       - run: node scripts/test_inbound.cjs
       - run: python scripts/test_standard_update.py
       - run: python scripts/test_standard_update_windows.py
+      - run: python scripts/test_company_print_windows.py
   postgresql18:
     runs-on: ubuntu-latest
     services:
@@ -64,6 +65,7 @@ jobs:
       - run: python -m pip install -r requirements.txt playwright==1.62.0 pymupdf==1.26.7
       - run: python scripts/fetch_inbound_vendor.py
       - run: node scripts/test_inbound_worker.cjs
+      - run: python scripts/smoke_inbound_work.py
       - run: python scripts/smoke_compact_ui.py
       - run: python scripts/smoke_stocktake.py
       - run: python scripts/smoke_inbound_handoff.py

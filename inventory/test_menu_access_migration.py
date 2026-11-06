@@ -19,9 +19,9 @@ class MenuAccessMigrationTests(TransactionTestCase):
             executor=MigrationExecutor(connection)
             executor.migrate([('inventory','0013_employee_menu_access')])
             self.assertEqual(list(User.objects.order_by('pk').values()),before)
-            from .models import EmployeeMenuAccess
+            EmployeeMenuAccess=executor.loader.project_state([('inventory','0013_employee_menu_access')]).apps.get_model('inventory','EmployeeMenuAccess')
             for user in User.objects.all():
-                grant=EmployeeMenuAccess.objects.get(user=user)
+                grant=EmployeeMenuAccess.objects.get(user_id=user.pk)
                 level='full' if user.is_staff else 'read'
                 self.assertEqual({key:getattr(grant,key) for key in MENU_LABELS},{key:level for key in MENU_LABELS})
         finally:

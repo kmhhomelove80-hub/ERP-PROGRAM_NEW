@@ -38,6 +38,8 @@ class MenuAccessMixin:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         rights = menu_permissions(self.instance) if self.instance.pk else {}
+        if self.instance.pk:
+            self.fields['inbound_record'].initial = EmployeeMenuAccess.objects.filter(user=self.instance, inbound_record=True).exists()
         for key, label in MENU_LABELS.items():
             field = self.fields[key + '_access']
             field.initial = FULL if rights.get(key) else READ
@@ -57,6 +59,7 @@ class MenuAccessMixin:
     def save(self, commit=True):
         user = super().save(commit=False)
         values = {key: self.cleaned_data[key + '_access'] for key in MENU_LABELS}
+        values['inbound_record'] = self.cleaned_data.get('inbound_record', False)
         user.is_staff = user.is_superuser or values['management'] == FULL
         user._pending_menu_access = values
         if commit:
@@ -68,11 +71,11 @@ class MenuAccessMixin:
 
 
 class BusinessUserChangeForm(MenuAccessMixin, UserChangeForm):
-    pass
+    inbound_record = forms.BooleanField(label='입고 LIST 배치 기록', required=False, help_text='모바일 위치·배치 기록만 허용합니다. 최종 입고 권한은 별도입니다.')
 
 
 class BusinessUserCreationForm(MenuAccessMixin, UserCreationForm):
-    pass
+    inbound_record = forms.BooleanField(label='입고 LIST 배치 기록', required=False)
 
 
 for form_class in (BusinessUserChangeForm, BusinessUserCreationForm):
@@ -93,11 +96,11 @@ class BusinessUserAdmin(UserAdmin):
     fieldsets = (
         ('로그인 정보', {'fields': ('username', 'password')}),
         ('직원 정보', {'fields': ('first_name', 'last_name', 'email')}),
-        ('대메뉴별 권한', {'fields': tuple(key + '_access' for key in MENU_LABELS),
+        ('대메뉴별 권한', {'fields': (*tuple(key + '_access' for key in MENU_LABELS), 'inbound_record'),
                        'description': '선택한 대메뉴 안의 기능에만 적용됩니다. 재고 조회는 모든 직원이 이용합니다. 재고 관리의 모두 가능은 이동 승인·실행을, 관리의 모두 가능은 직원 계정·품목 관리를 포함합니다.'}),
         ('사용 설정', {'fields': ('is_active',)}),
     )
-    add_fieldsets = ((None, {'classes': ('wide',), 'fields': ('username', 'password1', 'password2', *(key + '_access' for key in MENU_LABELS))}),)
+    add_fieldsets = ((None, {'classes': ('wide',), 'fields': ('username', 'password1', 'password2', *(key + '_access' for key in MENU_LABELS), 'inbound_record')}),)
     list_display = ('username', 'first_name', 'business_access', 'is_active')
     list_filter = ('is_active',)
     filter_horizontal = ()

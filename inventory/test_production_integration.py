@@ -89,7 +89,7 @@ class ProductionIntegrationTests(TestCase):
     def test_migration_graph_has_one_inventory_leaf_and_preserves_existing_dependencies(self):
         loader = MigrationLoader(connection)
         self.assertEqual(loader.detect_conflicts(), {})
-        self.assertEqual(loader.graph.leaf_nodes('inventory'), [('inventory', '0014_stocktake_and_cleanup')])
+        self.assertEqual(loader.graph.leaf_nodes('inventory'), [('inventory', '0015_inbound_work_and_company_print')])
         migration = loader.disk_migrations['inventory', '0012_production_plan']
         self.assertIn(('inventory', '0011_substitute_loans'), migration.dependencies)
         self.assertIn(('inventory', '0012_production_plan'), loader.disk_migrations['inventory', '0013_employee_menu_access'].dependencies)

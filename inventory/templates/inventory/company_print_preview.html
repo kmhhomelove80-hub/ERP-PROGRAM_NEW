@@ -1,0 +1,6 @@
+{% extends 'inventory/base.html' %}{% block content %}
+<h1>회사 프린터 출력 미리보기</h1><p>{{ document.project }} · {{ document.number }} · {{ document.total }}개 · {{ document.rows|length }}행</p>
+{% if printer.enabled %}<form method="post" class="dispatch-toolbar" data-final-confirm="회사에 있는 프린터로 실제 인쇄 요청을 보낼까요?">{% csrf_token %}<input type="hidden" name="token" value="{{ token }}"><label>프린터 {{ printer.name }}</label><label>부수 <input type="number" name="copies" value="1" min="1" max="5" required></label><label><input type="checkbox" name="confirmed" required> 목록과 부수 확인</label><button>회사 프린터로 출력 요청</button></form>{% else %}<p class="notice">회사 프린터가 아직 활성화되지 않았습니다. 관리자에게 프린터 설정과 인쇄 작업자 설치를 요청하세요.</p>{% endif %}
+<p><a href="{% url 'picking-detail' order.pk %}">피킹 목록으로 돌아가기</a> · <a href="{% url 'company-print-jobs' %}">출력 이력</a></p>
+<div class="table"><table><thead><tr><th>ERP 코드</th><th>모델 / 사양</th><th>위치</th><th>수량</th><th>입고 / 처리 상태</th></tr></thead><tbody>{% for row in document.rows %}<tr><td>{{ row.code }}</td><td class="wrap">{{ row.description }}</td><td>{{ row.location }}</td><td>{{ row.quantity }}</td><td>{{ row.receipt }} / {{ row.status }}</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

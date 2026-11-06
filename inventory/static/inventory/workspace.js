@@ -92,6 +92,7 @@
  for(const form of autoTimeForms){form.querySelector('[name=shipped_at]').addEventListener('input',()=>form.querySelector('[name=shipped_at_auto]').value='');refreshAutoFormTime(form);}
  document.addEventListener('submit',e=>{
   const form=e.target;
+  if(form.matches('.work-row'))return;
   if(form.dataset.submitting==='yes'){e.preventDefault();e.stopImmediatePropagation();return;}
   if(autoTimeForms.includes(form))refreshAutoFormTime(form);
   let message=form.dataset.finalConfirm;

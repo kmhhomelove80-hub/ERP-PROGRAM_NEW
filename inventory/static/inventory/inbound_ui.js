@@ -16,7 +16,7 @@ function update(){
  if(!$('date').value)errors.push('문서 날짜를 선택하세요.');
  let out=[];if(!errors.length)try{out=Inbound.output(rows);}catch(e){errors.push(e.message);}
  invalid=!!errors.length||!out.length;root.dataset.invalid=String(invalid);
- for(const id of ['copyERP','download','print','receive'])$(id).disabled=invalid;
+ for(const id of ['copyERP','download','print','receive','saveWork'])$(id).disabled=invalid;
  $('msg').textContent=errors.join('\n');
  root.querySelectorAll('.split').forEach(e=>{try{Inbound.parts(rows[+e.dataset.i]);e.classList.remove('bad');e.removeAttribute('aria-invalid');}catch{e.classList.add('bad');e.setAttribute('aria-invalid','true');}});
  $('itemCount').textContent=new Set(out.map(r=>r.code)).size;$('rowCount').textContent=out.length;$('totalQty').textContent=errors.length?'—':fmt(Inbound.sum(out.map(r=>r.qty)));
@@ -89,6 +89,16 @@ function legacyCopy(data){
  try{ok=document.execCommand('copy');}finally{document.removeEventListener('copy',handler);ta.remove();}
  if(!ok)throw Error('브라우저에서 복사를 허용하지 않습니다. 엑셀을 내려받아 셀을 복사하세요.');
 }
+$('saveWork').onclick=()=>{
+ update();if(invalid)return;
+ try{
+  if(sampleOnly)throw Error('가상 예제는 공동 작업으로 저장할 수 없습니다.');
+  const form=document.createElement('form');form.method='post';form.action=root.dataset.saveUrl;
+  const fields={action:'create',title:$('filename').textContent.slice(0,250),document_date:$('date').value,inbound_nonce:root.dataset.receiveNonce,inbound_revision:String(revision),inbound_rows:JSON.stringify(Inbound.erpCells(rows)),csrfmiddlewaretoken:root.querySelector('[name=csrfmiddlewaretoken]').value};
+  for(const [key,value] of Object.entries(fields)){const e=document.createElement('input');e.type='hidden';e.name=key;e.value=value;form.append(e);}
+  document.body.append(form);form.requestSubmit();
+ }catch(e){$('copyStatus').textContent=e.message;}
+};
 $('receive').onclick=()=>{
  update();if(invalid)return;
  try{
