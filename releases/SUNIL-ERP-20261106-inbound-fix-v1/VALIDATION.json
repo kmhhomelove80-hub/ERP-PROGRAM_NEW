@@ -1,0 +1,38 @@
+{
+  "success": true,
+  "windows_native_success": true,
+  "windows_schedule_restore_success": true,
+  "postgresql18_success": true,
+  "browser_success": true,
+  "commit": "4bb6dfb98840ecaafa52142c0c9905c24e4991a5",
+  "workflow_run": 42177431534,
+  "url": "https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/actions/runs/42177431534",
+  "jobs": [
+    {
+      "id": 127759008374,
+      "name": "windows-python312",
+      "conclusion": "success"
+    },
+    {
+      "id": 127759008517,
+      "name": "postgresql18",
+      "conclusion": "success"
+    },
+    {
+      "id": 127759008550,
+      "name": "browser",
+      "conclusion": "success"
+    }
+  ],
+  "private_uploaded_fixture_browser_verified": true,
+  "private_uploaded_fixture_published": false,
+  "source_payload_helpers_verified": 84,
+  "checks": [
+    "trailing_decimal_point_integer_quantities",
+    "exact_decimal_split_sum",
+    "reject_invalid_zero_negative_and_excess_precision",
+    "cp949_utf8_xls_xlsx_xlsm",
+    "private_uploaded_file_full_details_and_totals",
+    "clipboard_excel_print_regression"
+  ]
+}
