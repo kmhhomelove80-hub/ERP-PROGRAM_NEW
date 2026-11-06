@@ -1,0 +1,22 @@
+{
+  "warehouse-portfolio-ko-voiced.mp4": {
+    "bytes": 3934255,
+    "sha256": "68c495ecd678d8a2953f899e2314ecefe69649c7c2aef2314e587def1ea6d18c"
+  },
+  "narration-with-music.mp3": {
+    "bytes": 1696940,
+    "sha256": "a70b0d3df57765d444998b673ec453e9b63bfbdde8ce5d55e38428ab0b736288"
+  },
+  "narration.txt": {
+    "bytes": 1807,
+    "sha256": "b782a8db612c1411ef9c369234a6fe76f976fc8129fa0e831944c1ddf8877a3c"
+  },
+  "README.md": {
+    "bytes": 2812,
+    "sha256": "7b7c6e596b448d449e9917551440b890153edf008294953116336d768ae04e86"
+  },
+  "VOICE-LICENSE.txt": {
+    "bytes": 6385,
+    "sha256": "e98afb0c49355e6c236bd4577788c7b2c1d4196c4a676e8117bd7a3238b43a4c"
+  }
+}
