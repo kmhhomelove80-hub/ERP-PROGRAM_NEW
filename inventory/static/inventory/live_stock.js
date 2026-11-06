@@ -3,27 +3,29 @@
   if (!form) return;
   const results = document.querySelector(form.dataset.results || '#stock-results');
   const status = document.querySelector(form.dataset.status || '#stock-search-status');
-  let timer, controller, serial = 0, moreController, moreBusy=false;
+  let timer, controller, serial = 0, moreController, moreBusy=false,morePaused=false;
   const observer = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
     if (entries.some(e => e.isIntersecting)) maybeMore();
   }, {rootMargin:'300px'}) : null;
   function maybeMore() {
+    if(morePaused)return;
     const table=results.querySelector('.desktop-stock-table');
-    if(table?.offsetHeight && table.scrollHeight>table.clientHeight+20 && table.scrollTop+table.clientHeight<table.scrollHeight-200)return;
+    if(table?.offsetHeight && table.scrollHeight>table.clientHeight+20 && table.scrollTop+table.clientHeight<table.scrollHeight-Math.max(240,table.clientHeight))return;
     loadMore();
   }
   results.addEventListener('scroll',e=>{if(e.target.matches('.desktop-stock-table'))maybeMore();},true);
   function watchMore() {
     observer?.disconnect();
-    const link=results.querySelector('[data-load-more]');
-    if(link) observer?.observe(link);
+    const link=results.querySelector('[data-load-more]'),nav=results.querySelector('[data-stock-more]');
+    nav?.classList.add('auto-scroll-ready');
+    if(link&&nav&&!morePaused)observer?.observe(nav);
   }
-  function cancelMore() { moreController?.abort(); moreController=null; moreBusy=false; observer?.disconnect(); }
+  function cancelMore() { moreController?.abort(); moreController=null; moreBusy=false; morePaused=false; observer?.disconnect(); }
   async function loadMore() {
     const link=results.querySelector('[data-load-more]');
     if(!link || moreBusy) return;
     const version=serial;
-    moreBusy=true; moreController=new AbortController();
+    moreBusy=true;morePaused=false;const nav=link.closest('nav');nav.classList.remove('load-failed');const state=nav.querySelector('[data-stock-load-status]');if(state)state.textContent='불러오는 중…'; moreController=new AbortController();
     const endpoint=new URL(link.href); endpoint.searchParams.set('partial','1');
     link.textContent='불러오는 중…';
     try {
@@ -42,7 +44,7 @@
       status.textContent='추가 조회 완료';
     } catch(error) {
       if(error.name!=='AbortError' && version===serial) {
-        link.textContent='추가 조회 실패 · 눌러 다시 시도'; observer?.disconnect(); return;
+        nav.classList.add('load-failed');link.textContent='다시 시도';if(state)state.textContent='추가 조회 실패';morePaused=true;observer?.disconnect();return;
       }
     } finally { if(version===serial) moreBusy=false; }
     if(version===serial) watchMore();

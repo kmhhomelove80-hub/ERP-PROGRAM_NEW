@@ -29,7 +29,23 @@ Allocation.objects.create(stock=s,project='OTHER',quantity=999)
    browser=play.chromium.launch(executable_path=os.environ.get('ERP_CHROMIUM','/usr/bin/chromium'),args=['--no-sandbox'])
    page=browser.new_page(viewport={'width':1500,'height':900},accept_downloads=True);errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.on('dialog',lambda d:d.accept())
    page.goto(base+'/login/');page.locator('[name=username]').fill('fixture');page.locator('[name=password]').fill(password);page.get_by_role('button',name='로그인',exact=True).click();page.wait_for_url(base+'/')
+   page.wait_for_timeout(300)
+   attempts=[]
+   def interrupt_once(route):
+    from urllib.parse import urlsplit,parse_qs
+    u=urlsplit(route.request.url)
+    if u.path=='/' and parse_qs(u.query).get('page')==['2']:
+     attempts.append(route.request.url)
+     if len(attempts)==1:route.fulfill(status=500,body='synthetic retry');return
+    route.continue_()
+   page.route('**/*',interrupt_once);page.reload()
+   page.locator('.desktop-stock-table').evaluate('(el)=>el.scrollTop=el.scrollHeight')
+   expect(page.locator('[data-stock-more]')).to_have_class(__import__('re').compile('load-failed'))
+   expect(page.locator('[data-load-more]')).to_be_visible();page.wait_for_timeout(200);assert len(attempts)==1
+   page.locator('[data-load-more]').click()
    for _ in range(3):page.locator('.desktop-stock-table').evaluate('(el)=>el.scrollTop=el.scrollHeight');page.wait_for_timeout(350)
+   page.unroute('**/*',interrupt_once)
+   assert page.locator('[data-load-more]:visible').count()==0
    expect(page.locator('.desktop-stock-table [data-stock-id]')).to_have_count(111)
    assert len(set(page.locator('.desktop-stock-table [data-stock-id]').evaluate_all('(els)=>els.map(e=>e.dataset.stockId)')))==111
    page.locator('[name=q]').fill('L003');expect(page.locator('.desktop-stock-table [data-stock-id]')).to_have_count(1)

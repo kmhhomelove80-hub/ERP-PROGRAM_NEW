@@ -3,6 +3,14 @@
  const all=document.querySelector('#select-page'),status=document.querySelector('#selection-status');let anchor=null;
  const boxes=()=>[...form.querySelectorAll('input[name=allocations]')];
  const total=Number(document.querySelector('#filtered-quantity').dataset.quantity);
+ const time=form.querySelector('[name=shipped_at]'),auto=form.querySelector('[name=shipped_at_auto]');
+ function refreshTime(){
+  if(!auto||!['true','on','1'].includes(auto.value.toLowerCase())||!time)return;
+  const parts=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date());
+  time.value=parts.replace(' ','T');
+ }
+ time?.addEventListener('input',()=>{auto.value='';});
+ document.addEventListener('allocation-time-refresh',refreshTime);refreshTime();
  function update(){
   const list=boxes(),chosen=list.filter(b=>b.checked),filtered=form.querySelector('[name=scope]:checked')?.value==='filtered';
   document.querySelector('#processing-quantity').textContent=(filtered?total:chosen.reduce((s,b)=>s+Number(b.dataset.quantity),0)).toLocaleString('ko-KR');

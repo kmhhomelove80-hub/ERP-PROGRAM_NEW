@@ -1,4 +1,5 @@
 import uuid
+from django.utils import timezone
 from django import forms
 from .models import Item, Stock, Receipt
 
@@ -79,12 +80,13 @@ class AllocationActionForm(forms.Form):
     from .models import Allocation
     allocations = forms.ModelMultipleChoiceField(label='대상 행',required=False,queryset=Allocation.objects.filter(state='reserved'),widget=forms.CheckboxSelectMultiple)
     action = forms.ChoiceField(label='처리',choices=[('release','실제 출고 완료 → Release'),('cancel','예약 취소')])
-    shipped_at = forms.DateTimeField(label='실제 출고 시각 (한국 시간)',required=False,widget=forms.DateTimeInput(attrs={'type':'datetime-local'}))
+    shipped_at = forms.DateTimeField(label='출고 시각 (한국 시간)',required=False,initial=timezone.now,widget=forms.DateTimeInput(format='%Y-%m-%dT%H:%M',attrs={'type':'datetime-local'}))
+    shipped_at_auto = forms.BooleanField(required=False,initial=True,widget=forms.HiddenInput)
     confirmed = forms.BooleanField(label='선택한 행과 수량을 확인했으며, 각 행의 전량을 처리합니다.')
     def clean(self):
         data = super().clean()
-        if data.get('action') == 'release' and not data.get('shipped_at'):
-            self.add_error('shipped_at','Release에는 실제 출고 시각이 필요합니다.')
+        if data.get('action') == 'release' and (data.get('shipped_at_auto') or not data.get('shipped_at')):
+            data['shipped_at']=timezone.now()
         return data
 
 class MovementRequestForm(forms.Form):
@@ -186,8 +188,13 @@ class SubstitutionForm(forms.Form):
 
 
 class SubstitutionDispatchForm(forms.Form):
-    shipped_at=forms.DateTimeField(label='실제 대체 출고 시각 (한국 시간)',widget=forms.DateTimeInput(attrs={'type':'datetime-local'}))
+    shipped_at=forms.DateTimeField(label='실제 대체 출고 시각 (한국 시간)',required=False,initial=timezone.now,widget=forms.DateTimeInput(format='%Y-%m-%dT%H:%M',attrs={'type':'datetime-local'}))
+    shipped_at_auto=forms.BooleanField(required=False,initial=True,widget=forms.HiddenInput)
     product_confirmed=forms.BooleanField(label='동일 제품이거나 필요한 수정을 완료했고, 실제 대체품이 출고됐습니다.')
+    def clean(self):
+        data=super().clean()
+        if data.get('shipped_at_auto') or not data.get('shipped_at'):data['shipped_at']=timezone.now()
+        return data
 
 
 class ReceiptSettlementChoice(forms.ModelChoiceField):
