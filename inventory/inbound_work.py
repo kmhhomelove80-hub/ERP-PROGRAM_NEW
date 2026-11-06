@@ -55,10 +55,10 @@ def create_work(*,data,actor):
             if not isinstance(cell,list) or len(cell)!=5:raise ValueError
             code=clean_text(cell[0],100,False)
             if code.startswith(('=','#')):raise ValueError
-            text=str(cell[3])
-            if not re.fullmatch(r'\d+(?:\.\d{0,12})?',text):raise ValueError
-            quantity=Decimal(text)
-            if not 0<quantity<=2147483647:raise ValueError
+            if isinstance(cell[3],bool) or not isinstance(cell[3],(str,int,float)):raise ValueError
+            if len(str(cell[3]))>100:raise ValueError
+            quantity=Decimal(str(cell[3]))
+            if not quantity.is_finite() or not 0<quantity<=2147483647 or quantity.as_tuple().exponent < -12:raise ValueError
             rows.append([code,clean_text(cell[1],250,multiline=True),clean_text(cell[2],5000,multiline=True),format(quantity,'f'),clean_text(cell[4],150)])
     except (ValueError,KeyError,TypeError,InvalidOperation,signing.BadSignature):
         raise ValidationError('저장 자료가 올바르지 않거나 만료되었습니다. 파일과 날짜를 다시 확인하세요.')

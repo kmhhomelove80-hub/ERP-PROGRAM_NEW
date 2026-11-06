@@ -38,6 +38,10 @@ if($Mode -in @('CheckServer','ShareServer')){
     $action=New-ScheduledTaskAction -Execute $powershell -Argument $arguments -WorkingDirectory $app
     $trigger=New-ScheduledTaskTrigger -AtLogOn -User $identity
     $principal=New-ScheduledTaskPrincipal -UserId $identity -LogonType Interactive -RunLevel Limited
+    $existing=Get-ScheduledTask -TaskName 'SUNIL-Company-Printer' -ErrorAction SilentlyContinue
+    if($existing){
+        if($existing.TaskPath -ne '\' -or @($existing.Actions).Count -ne 1 -or $existing.Actions[0].Arguments -notlike '*Run-PrintWorker.ps1*'){throw '같은 이름의 별도 예약 작업을 덮어쓰지 않습니다.'}
+    }
     $settings=New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
     Register-ScheduledTask -TaskName 'SUNIL-Company-Printer' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'ERP에서 요청한 회사 프린터 작업 처리' -Force|Out-Null
     Start-ScheduledTask -TaskName 'SUNIL-Company-Printer'

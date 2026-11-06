@@ -101,6 +101,7 @@ try {
             $doc.PrinterSettings.PrinterName=[string]$job.printer
             if(-not $doc.PrinterSettings.IsValid){throw '해당 계정에서 프린터를 사용할 수 없습니다.'}
             $doc.PrinterSettings.Copies=[int16]$job.copies
+            $doc.PrinterSettings.Collate=$true
             $doc.DefaultPageSettings.Landscape=$true
             $doc.DefaultPageSettings.Margins=New-Object System.Drawing.Printing.Margins(40,40,40,40)
             foreach($paper in $doc.PrinterSettings.PaperSizes){if($paper.Kind -eq [System.Drawing.Printing.PaperKind]::A4){$doc.DefaultPageSettings.PaperSize=$paper;break}}

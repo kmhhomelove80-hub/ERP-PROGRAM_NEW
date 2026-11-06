@@ -76,3 +76,10 @@ class SharedInboundTests(TestCase):
         data=dict(self.data,inbound_revision='2',inbound_rows=json.dumps([['ML','가상\n모델','25W\n220V',1,'']]))
         work=create_work(data=data,actor=self.manager);row=work.rows.get()
         self.assertEqual(row.name,'가상 모델');self.assertEqual(row.specification,'25W 220V')
+
+    def test_small_numeric_quantity_from_json_preserves_precision(self):
+        data=dict(self.data,inbound_revision='2',inbound_rows=json.dumps([['SMALL','가상','1W',0.0000001,'']]))
+        work=create_work(data=data,actor=self.manager)
+        self.assertEqual(work.rows.get().quantity,'0.0000001')
+        for quantity in [True, 'NaN', 'Infinity', '1e-10000']:
+            with self.assertRaises(ValidationError):create_work(data=dict(data,inbound_revision='3',inbound_rows=json.dumps([['SMALL','가상','1W',quantity,'']])),actor=self.manager)
