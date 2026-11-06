@@ -1,0 +1,22 @@
+{
+  "warehouse-portfolio-1080p-v2.mp4": {
+    "bytes": 4880091,
+    "sha256": "94afc442d1531669ac5d5f6addf85632144ea2b3f291682059c5415ab4687d6e"
+  },
+  "voice-preview-20s.mp3": {
+    "bytes": 481580,
+    "sha256": "4c80fca3684f70539ee976cbf33c8b21f54b322afcecb0aec1cceb8e0b52dbd5"
+  },
+  "frame-quality.png": {
+    "bytes": 343654,
+    "sha256": "b5eddf98fb9024acd8a6ee1dbc9ba4c7a93acc533300f20573321528b9d7538a"
+  },
+  "README.md": {
+    "bytes": 3286,
+    "sha256": "6081c65115a6fa63eac74f17b25a3d05dd9b706e975690fdda88228c8a3e86b4"
+  },
+  "narration.txt": {
+    "bytes": 1807,
+    "sha256": "b782a8db612c1411ef9c369234a6fe76f976fc8129fa0e831944c1ddf8877a3c"
+  }
+}
