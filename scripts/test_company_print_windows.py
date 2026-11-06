@@ -1,5 +1,6 @@
 """Real Windows GDI pagination and PowerShell syntax, without sending to a printer."""
-import json,os,subprocess,tempfile
+import json,os,subprocess,tempfile,sys
+sys.stdout.reconfigure(encoding="utf-8")
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 if os.name!='nt':raise SystemExit('Windows 전용 검사')

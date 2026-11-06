@@ -39,8 +39,10 @@
     },
     {
       "path": "inventory/admin.py",
-      "accepted_previous_sha256": [],
-      "required_existing": false
+      "accepted_previous_sha256": [
+        "3d640bba23a2734b66d8d5e7b59529beb625f20ac5fab81db52090a9419ed1f1"
+      ],
+      "required_existing": true
     },
     {
       "path": "inventory/allocation_filters.py",
@@ -60,7 +62,7 @@
         "1ce0a162ebce45f98f325f092c7b216ca3db7c8484bda9de9c2cefe6f25244a8",
         "cddf884c493029beba146caea1b59f046c3fd498e8dc34c40014c01dcb4ee075"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/cleanup.py",
@@ -68,7 +70,7 @@
         "50f2bc5825600267a6a23af7cd5f2a3512dcee26451d06c0dbf75488a22c6ae5",
         "81c7c656726ee94e7bad78fb7d69986565a2c2f7d21764bcf316a14b79771677"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/cleanup_views.py",
@@ -89,8 +91,10 @@
     },
     {
       "path": "inventory/context_processors.py",
-      "accepted_previous_sha256": [],
-      "required_existing": false
+      "accepted_previous_sha256": [
+        "0498368f27933d070a731ee4fc058dace5d42b64fdc54581400e7d9439a15469"
+      ],
+      "required_existing": true
     },
     {
       "path": "inventory/customer_picking.py",
@@ -123,7 +127,7 @@
         "1ff43370c36966505d9d81295845f7117d5ea666ddbb96add2821b16c6254462",
         "aaea2994b61d90f7b805c57c0166069a7da91be707d49145657b827717741b68"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/inbound_views.py",
@@ -225,7 +229,7 @@
         "0d86ee8e518df3f4b7156b59d9337226e62e478508970cf728a936d80a8591ea",
         "a69e61abcf5d8778432eb9bec417dfb8f68df4bfcc3fc6a4929ed08adeb9b4c9"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/production_reader.py",
@@ -346,7 +350,7 @@
         "6eb139cb105b52de13e4f164537efecaf48d3112ec0d070fd2244373e18826fb",
         "aecf0be756ba4d83ff2f1a931f98fc1bdffd85ecc5326d79b8631bb3a0436d5b"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/static/inventory/vendor/LICENSE.SheetJS.txt",
@@ -411,7 +415,7 @@
         "00b685566eca3d29b3608a71c708f091fbc5da0966ba9b5ac77514f0c616ebb4",
         "08418bec433164179284943cccb102e3027795ac70b869b4a6be0e12d1b50a26"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/templates/inventory/allocations.html",
@@ -429,7 +433,7 @@
         "52f2790b31342bf5241661154971aed7c847f47e3a2ee2b56a0872fbb9270a5c",
         "be97635c35ecac15646a3d7661bfa66d1f08366f4dcc69ee80dacc7aefcfd575"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/templates/inventory/base.html",
@@ -448,7 +452,7 @@
         "c17dcd31460cb4b3aef0719008badd96a3af9196c6379de173d27f10a3dd1c97",
         "ec3ac63dfec936137f1fa12988401acc09e79e92f4210281e4fdb8ca688bf7b8"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/templates/inventory/cleanup_decisions.html",
@@ -492,7 +496,7 @@
         "9e912f1d914a380c78b6fec8f67ce3b66a032e4388d7df9dcf3d5f92f6fbd656",
         "b3a925edd2611e8208d40645f94bf42768befc3ee71b882d1146ccffe4eceead"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/templates/inventory/erp_list.html",
@@ -500,7 +504,7 @@
         "0117e8c673b12fb9f98f8518d7b34e61bfc8ee99c68f6b1dc0f87e30b403182c",
         "bbb411e308dba09936c2b86428db9b29c06d015ee80bb24f7927f798181e6093"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/templates/inventory/history.html",
@@ -508,7 +512,7 @@
         "8a21f71081b939c76b5b74395fd0fa239d7fdf6acc7c807c85095263947b762e",
         "d6016c392c6c1cc739527316aaf89c35d215a3847aebf922f64f3963383397d4"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/templates/inventory/inbound_list.html",
@@ -536,7 +540,7 @@
         "881a2caaeeacf8ae2c72c21d69e7fbf16299d6352ecdb114aa8931b018a5e2e5",
         "b4b574416c54d724563e52e331cbdf6fe551a362208266ad8ae75640ddcc7e10"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/templates/inventory/picking_detail.html",
@@ -552,7 +556,7 @@
         "034c7a21f95a0cc8657e057e4bbd5dad9f2e8eac1aa9bdbebd635e40a77f0e36",
         "3721c81cde56fd4ee924a1a2a3c4f64bc0f67ea5afcf692ab77cd414cc2c87ca"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/templates/inventory/production_plan.html",
@@ -560,7 +564,7 @@
         "5b17e7e45233f803a23c5a5aaf2c8e84ec4caaf3b4e4c729ba9eaab2fcfd1f9f",
         "7e1322074973f40f0d9d6394151247a9bd37275e5ed430e4a65ff7ba80eda88d"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/templates/inventory/receipt_bulk.html",
@@ -568,7 +572,7 @@
         "326b93e426813249cc08cda4b9ed3a6495f62e9a8465aff4cbafc3b93e2445b7",
         "a7dee93fde5dcc5455a0b28f68108b905d4956564c5f85a9a1962b5172374dd8"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/templates/inventory/receipts.html",
@@ -576,7 +580,7 @@
         "a977f680a987fcc15366f1647d367adb67171fd33b20b2e331b3513a66707846",
         "f85801767da1bc6a7735a790883357d3f26b89941ae6681607ac0e1f970cf579"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/templates/inventory/scroll_page.html",
@@ -591,7 +595,7 @@
         "4e63450ce246a99b39bea0f784a08c91af17f401e017300851ac209e4ff7d98a",
         "e9f9cda31ee811a053e4acac0542d295082dc7a72cb8caccff3a209cd252ac9f"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/templates/inventory/stock_list.html",
@@ -599,7 +603,7 @@
         "8d33f33098c2611510f874a59283cf723ffe155d7de6a912fcc532ff10e86fdd",
         "b25d09e4870b7449b142c256768d20217679e0cca1796440270c7dac456705bd"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/templates/inventory/stock_results.html",
@@ -637,7 +641,7 @@
         "63d4f2d21c8b9f11c213d25672a2a48f702d7e6843089bea4902004802923d64",
         "c1295c0b52a527c6c7db925c0f4860451707830d78fc5d51a82db1d56573614b"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/templatetags/inventory_text.py",
@@ -645,7 +649,7 @@
         "ce2cf6abffe6b9bbbbc864d8720333738591f1962de43e76a840b2c059bc9956",
         "f52e6e0b1f66c67e8a4fd34ed04384f7ed004f5bc5af58b0c3f53d79d0b83e83"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/templatetags/scrolling.py",
@@ -674,7 +678,7 @@
         "40833f94a0e41b9e2a310fa59336f782da1bc396b044b134cda4c6f79a829146",
         "6db0f9cf8c1599304755fc076199d2142771b73a962bbd9326ef5541688ea01c"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/test_inbound.py",
@@ -696,7 +700,7 @@
         "84f0990b91419383a0ec2c9953d581acff8eca6fcc1587e49b755665b52a6b26",
         "86994fb1e7ca4f87224736c162aec91fa1a41a316018e2db0e1e6e9e17d8e0ea"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/test_production_integration.py",
@@ -704,7 +708,7 @@
         "57a17c83cbbf63667bea5865df26e3410e37dbb4b25abb460f8479b64810836c",
         "ab979bc3b285059de18c21887e97c11b4e9896aaadc299b7b6123f7088c8ef1f"
       ],
-      "required_existing": false
+      "required_existing": true
     },
     {
       "path": "inventory/test_stock_mobile_search.py",

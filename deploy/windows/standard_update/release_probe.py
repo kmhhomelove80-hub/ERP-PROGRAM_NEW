@@ -41,7 +41,7 @@ elif mode == 'health':
         raise RuntimeError('No active ERP account for read-only rendering check')
     paths = ['/', '/receipts/', '/allocations/', '/movements/']
     if '--old' not in sys.argv:
-        paths.append('/production/')
+        paths.extend(['/production/','/inbound/saved/','/company-print/'])
     for path in paths:
         host = sys.argv[sys.argv.index('--host')+1] if '--host' in sys.argv else '127.0.0.1'
         request = RequestFactory().get(path, HTTP_HOST=host)
