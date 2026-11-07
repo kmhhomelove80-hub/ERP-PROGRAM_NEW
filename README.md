@@ -1,5 +1,15 @@
 # SUNIL 창고 관리
 
+## 최신 통합 업데이트 · 2026-11-07
+
+**SUNIL-ERP-20261107-final-v1** — 위치별 재고 머리글 필터·피킹 주문 이력 바로가기·부족표 대체품 등록. 입고 LIST 누적/공동 작업과 회사 서버 프린터를 포함합니다.
+
+- [업데이트 ZIP 다운로드](https://raw.githubusercontent.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/3cbf34fbbe55ec61156dbd8dfd57168f9383c021/releases/SUNIL-ERP-20261107-final-v1/SUNIL-ERP-20261107-final-v1.zip)
+- [설치 절차](https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/blob/3cbf34fbbe55ec61156dbd8dfd57168f9383c021/releases/SUNIL-ERP-20261107-final-v1/README.md) · [최종 진도 관리표](https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/blob/3cbf34fbbe55ec61156dbd8dfd57168f9383c021/releases/SUNIL-ERP-20261107-final-v1/progress.md) · [검증 결과](https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/blob/3cbf34fbbe55ec61156dbd8dfd57168f9383c021/releases/SUNIL-ERP-20261107-final-v1/VALIDATION.json)
+- Windows·PostgreSQL 18·브라우저 검증 통과. 실제 운영 적용과 프린터 종이 출력은 현장 확인이 필요합니다.
+
+
+
 회사 ERP의 부산(Y09) 로케이션 관리를 보완하는 Django 웹 프로그램. 영주(Y02)는 본사 참고 수량이다. PC와 휴대폰에서 재고·입고·피킹·출고·이동·전산 대조를 사용한다. AS는 제외한다.
 
 2026-11-03 기능 업데이트입니다. 기준 커밋은 d425d71이며, 기존 Windows 운영 환경에 대한 업데이트 절차는 아래 문서를 사용합니다. 개발 환경에서는 운영 서버·DB를 변경하지 않습니다.
