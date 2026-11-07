@@ -33,7 +33,7 @@
    }
   }
  }
- const previewConfirm=main.querySelector('form:has([name=preview_token]),form:has([name=preview_id])');
+ const previewConfirm=[...main.querySelectorAll('form:has([name=preview_token]),form:has([name=preview_id])')].find(form=>!form.closest('.table'));
  const previewTable=main.querySelector('.table');
  if(previewConfirm&&previewTable&&!previewConfirm.contains(previewTable)){
   previewTable.before(previewConfirm);previewConfirm.classList.add('compact-preview-confirm');

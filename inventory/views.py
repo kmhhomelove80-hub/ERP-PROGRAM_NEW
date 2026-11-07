@@ -14,7 +14,12 @@ from .services import receive_stock, confirm_arrival
 @login_required
 def stock_list(request):
     from .stock_search import search_stocks
-    stocks, filters = search_stocks(request.GET)
+    from .stock_filters import parse as parse_stock_columns
+    from django.http import HttpResponseBadRequest
+    try:
+        stocks, filters = search_stocks(request.GET)
+    except ValidationError as error:
+        return HttpResponseBadRequest(' / '.join(error.messages))
     query, status, scan_mode = filters['q'], filters['status'], filters['scan']
     # Sort the full filtered queryset before pagination; never accept SQL field names.
     from django.db.models import F, Min, Value
@@ -29,14 +34,22 @@ def stock_list(request):
     if sort == 'hull':
         stocks = stocks.annotate(sort_hull=Coalesce(Min('allocation__project', filter=Q(allocation__state='reserved')), Value('')))
     stocks = stocks.order_by(('-' if direction == 'desc' else '') + fields[sort], 'item__code', 'location', 'pk')
+    stock_params = request.GET.copy()
+    stock_params.pop('page', None)
+    stock_params.pop('partial', None)
+    for key, value in [('q', query), ('status', status), ('scan', scan_mode), ('model', filters['model']), ('spec', filters['spec']), ('sort', sort), ('direction', direction)]:
+        stock_params[key] = value
     sort_headers = []
     for key, label in [('code', 'ITEM No.'), ('available', '잔량'), ('location', 'Location'), ('allocated', 'allocated'), ('hull', 'HULL')]:
         active = sort == key
         next_direction = 'desc' if active and direction == 'asc' else 'asc'
+        sort_params = stock_params.copy()
+        sort_params['sort'] = key
+        sort_params['direction'] = next_direction
         sort_headers.append({'label': label, 'key': key, 'active': active,
                              'arrow': '↑' if direction == 'asc' else '↓',
                              'aria': ('ascending' if direction == 'asc' else 'descending') if active else 'none',
-                             'url': '?' + urlencode({'q': query, 'status': status, 'sort': key, 'direction': next_direction, 'scan': scan_mode, 'model': filters['model'], 'spec': filters['spec']})})
+                             'url': '?' + sort_params.urlencode()})
     totals = stocks.aggregate(quantity=Sum('quantity'),reserved=Sum('reserved'))
     totals['available'] = (totals['quantity'] or 0) - (totals['reserved'] or 0)
     from .models import Item
@@ -51,7 +64,7 @@ def stock_list(request):
     from .reconciliation import latest_reference
     reference,erp_snapshot=latest_reference('Y09',[s.item.code for s in page.object_list])
     for stock in page.object_list:stock.erp_pending=reference.get(stock.item.code,{}).get('shipping_pending')
-    return render(request,'inventory/stock_results.html' if request.GET.get('partial')=='1' else 'inventory/stock_list.html',{'page_obj':page, 'query':query,'status':status,'totals':totals,'statuses':Stock.Status.choices,'erp_snapshot':erp_snapshot,'sort':sort,'direction':direction,'sort_headers':sort_headers,'scan_mode':scan_mode,'scan_item_exists':scan_item_exists,'model_query':filters['model'],'spec_query':filters['spec']})
+    return render(request,'inventory/stock_results.html' if request.GET.get('partial')=='1' else 'inventory/stock_list.html',{'page_obj':page, 'query':query,'status':status,'totals':totals,'statuses':Stock.Status.choices,'erp_snapshot':erp_snapshot,'sort':sort,'direction':direction,'sort_headers':sort_headers,'scan_mode':scan_mode,'scan_item_exists':scan_item_exists,'model_query':filters['model'],'spec_query':filters['spec'], 'stock_column_filters':parse_stock_columns(request.GET), 'stock_querystring':stock_params.urlencode()})
 
 @menu_access('receiving')
 def receipt_create(request):
@@ -137,6 +150,10 @@ def picking_create(request):
                     messages.success(request,'피킹 예약을 등록했습니다. 재고 차감은 실제 출고 후 Release에서 수행하세요.')
                     from .delivery_bridge import reply_url
                     target = reply_url(order)
+                    if request.POST.get('substitute_requested'):
+                        from django.urls import reverse
+                        from urllib.parse import urlencode
+                        return redirect(reverse('substitution-create', args=[order.pk]) + '?' + urlencode({'requested': request.POST['substitute_requested']}))
                     if target:return render(request, 'inventory/delivery_done.html', {'order':order, 'delivery_reply_url':target})
                     return redirect('picking-detail',pk=order.pk)
         except (signing.BadSignature, ValidationError) as error:
@@ -469,7 +486,10 @@ def stock_export(request):
     from .reconciliation import latest_reference
     from .locking import warehouse_lock
     from .stock_search import search_stocks
-    rows, filters = search_stocks(request.GET)
+    try:
+        rows, filters = search_stocks(request.GET)
+    except ValidationError as error:
+        return HttpResponse(' / '.join(error.messages), status=400)
     with warehouse_lock():
         if rows.count()>MAX_EXPORT_ROWS:return HttpResponse('검색 범위를 좁혀주세요. 내보내기 행 수 제한을 초과했습니다.',status=400)
         reference,snapshot=latest_reference('Y09',list(rows.values_list('item__code',flat=True)))
@@ -567,16 +587,22 @@ def substitution_create(request, pk):
     from .models import PickingOrder
     from .forms import SubstitutionForm
     from .substitutions import reserve_substitution
+    from django.urls import reverse
     order=get_object_or_404(PickingOrder,pk=pk)
-    form=SubstitutionForm(request.POST or None,order=order)
+    from .substitutions import demand_balance
+    balance = [row for row in demand_balance(order) if row['shortage']]
+    requested = request.GET.get('requested', '')
+    selected = next((row for row in balance if row['code'] == requested), None)
+    initial = {'requested': selected['code'], 'quantity': selected['shortage']} if selected else {}
+    form=SubstitutionForm(request.POST or None,order=order,initial=initial)
     if request.method=='POST' and form.is_valid():
         d=form.cleaned_data
         try:record=reserve_substitution(request_id=d['request_id'],order_id=order.pk,requested=d['requested'],stock_id=d['stock'].pk,quantity=d['quantity'],reason=d['reason'],actor=request.user)
         except ValidationError as error:form.add_error(None,error)
         else:
             messages.success(request,'대체품을 예약했습니다. 실제 출고 시 대체 출고(빌림)를 처리하세요.')
-            return redirect('substitution-detail',pk=record.pk)
-    return render(request,'inventory/form.html',{'form':form,'title':f'{order.project} 대체품 배정','description':'현재 미배정 수량을 다른 코드로 1:1 배정합니다. 이 단계는 예약이며 실물 차감은 대체 출고(빌림) 때 수행합니다.'})
+            return redirect('picking-detail',pk=order.pk) if selected else redirect('substitution-detail',pk=record.pk)
+    return render(request,'inventory/form.html',{'form':form,'title':f'{order.project} 대체품 등록', 'return_url':reverse('picking-detail', args=[order.pk]), 'description':'현재 미배정 수량을 다른 코드로 1:1 배정합니다. 이 단계는 예약이며 실물 차감은 대체 출고(빌림) 때 수행합니다.'})
 
 
 @menu_access('shipping')

@@ -3,7 +3,7 @@ from django.db.models import Q
 from .models import Stock
 
 
-def search_stocks(params):
+def search_stocks(params, *, columns=True):
     filters = {key: params.get(key, '').strip() for key in ('q', 'model', 'spec', 'status')}
     filters['scan'] = '1' if params.get('scan') == '1' and filters['q'] else ''
     if filters['status'] not in Stock.Status.values:
@@ -26,4 +26,7 @@ def search_stocks(params):
                            | Q(legacy_specification='', item__specification__icontains=filters['spec']))
     if filters['status']:
         rows = rows.filter(status=filters['status'])
+    if columns:
+        from .stock_filters import parse, apply
+        rows = apply(rows, parse(params))
     return rows, filters

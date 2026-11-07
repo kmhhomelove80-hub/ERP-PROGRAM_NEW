@@ -1,3 +1,5 @@
+from inventory import stock_filters
+from django.contrib.auth.decorators import login_required
 from inventory import company_print_views
 from inventory import allocation_filters
 from inventory.access import menu_access
@@ -11,6 +13,7 @@ from django.urls import path
 from inventory import views, production_views, inbound_views
 from .auth_views import WarehouseLoginView
 urlpatterns = [
+    path('stock/options/', login_required(require_GET(stock_filters.options)), name='stock-options'),
     path('company-print/',company_print_views.jobs,name='company-print-jobs'),
     path('company-print/settings/',company_print_views.settings,name='company-printer-settings'),
     path('picking/<uuid:pk>/company-print/',company_print_views.order_print,name='company-print-preview'),

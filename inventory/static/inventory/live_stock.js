@@ -71,6 +71,7 @@
       const html = await response.text();
       if (version !== serial) return;
       results.innerHTML = html;
+      document.dispatchEvent(new Event('stock-results-updated'));
       watchMore();
       history.replaceState(null, '', url);
       const download = document.querySelector('#stock-export');
@@ -84,7 +85,9 @@
   }
   function url() {
     const target = new URL(location.href);
-    const params = new URLSearchParams(new FormData(form));
+    const params = new URLSearchParams(target.search);
+    for (const key of ['q','status','scan','model','spec']) params.set(key, new FormData(form).get(key) || '');
+    params.delete('page'); params.delete('partial');
     for (const key of ['sort', 'direction']) {
       if (target.searchParams.has(key)) params.set(key, target.searchParams.get(key));
     }
@@ -112,7 +115,7 @@
   form.addEventListener('submit', event => {event.preventDefault(); refresh(url());});
   results.addEventListener('click', event => {
     const link = event.target.closest('nav a, a[data-sort-link]');
-    if (link && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+    if (link && !link.hasAttribute('data-load-more') && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
       if (event.button !== 0 || event.altKey) return;
       event.preventDefault();
       const target = new URL(link.href);

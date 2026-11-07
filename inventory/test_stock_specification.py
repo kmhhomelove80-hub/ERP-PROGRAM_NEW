@@ -14,7 +14,8 @@ class StockSpecificationTests(TestCase):
         for params in [{},{'partial':'1'},{'partial':'1','sort':'location','direction':'desc'}]:
             response=self.client.get('/',params)
             html=response.content.decode().split('<div class="mobile-stock-cards">')[0]
-            self.assertIn('<th>ITEM No.</th><th>사양</th>',html)
+            self.assertIn('data-field="code"', html)
+            self.assertIn('data-field="specification"', html)
             self.assertIn('DC24V IP67 &lt;시험&gt;',html)
             self.assertIn('AC220V 기본 사양',html)
             self.assertNotIn('위치 모델명',html)

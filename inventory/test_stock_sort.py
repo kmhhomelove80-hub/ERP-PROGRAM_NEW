@@ -29,7 +29,14 @@ class StockSortTests(TestCase):
         response = self.client.get('/', {'sort':'available','direction':'desc','q':'AAA'})
         self.assertEqual(response.context['page_obj'][0].quantity,150)
         self.assertEqual(response.context['page_obj'].paginator.count,52)
-        self.assertContains(response,'sort=available&amp;direction=desc&amp;model=&amp;spec=&amp;page=2')
+        from html import unescape
+        import re
+        from urllib.parse import urlparse, parse_qs
+        link = re.search(r'data-load-more href="([^"]+)"', response.content.decode()).group(1)
+        params = parse_qs(urlparse(unescape(link)).query)
+        self.assertEqual(params['sort'], ['available'])
+        self.assertEqual(params['direction'], ['desc'])
+        self.assertEqual(params['page'], ['2'])
         response = self.client.get('/', {'sort':'available','direction':'desc','q':'AAA','page':2})
         self.assertEqual(response.context['page_obj'][-1],self.a)
 

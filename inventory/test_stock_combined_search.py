@@ -46,7 +46,8 @@ class CombinedStockSearchTests(TestCase):
         for header in response.context['sort_headers']:
             params=parse_qs(urlparse(header['url']).query)
             self.assertEqual((params['model'],params['spec']),(['acs'],['ip56']))
-        self.assertContains(response,'model=acs&amp;spec=ip56&amp;page=2')
+        self.assertContains(response,'model=acs&amp;spec=ip56')
+        self.assertContains(response,'page=2')
         partial=self.client.get('/',{'model':'acs','spec':'ip56','page':2,'partial':'1'})
         self.assertEqual(len(partial.context['page_obj']),2)
         self.assertNotContains(partial,'<html')
