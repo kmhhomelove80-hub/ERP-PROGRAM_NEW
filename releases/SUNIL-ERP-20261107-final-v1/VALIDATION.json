@@ -1,0 +1,50 @@
+{
+  "success": true,
+  "windows_native_success": true,
+  "windows_schedule_restore_success": true,
+  "postgresql18_success": true,
+  "browser_success": true,
+  "commit": "c422e1eacdffdd99cee5d2c0a9b2d5ef49100b54",
+  "workflow_url": "https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/actions/runs/42337154352",
+  "erp_tests_url": "https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/actions/runs/42337154247",
+  "job_ids": {
+    "windows-python312": 128296558998,
+    "browser": 128296559167,
+    "postgresql18": 128296559334
+  },
+  "payload_source_files_matched": 142,
+  "third_party_bundle": "SheetJS 0.20.3 pinned integrity verified",
+  "compatibility_versions": 8,
+  "compatibility_checks": [
+    "apply_files",
+    "migrate",
+    "unchanged_existing_stock_accounts_permissions",
+    "stock_page_and_filter_api",
+    "saved_inbound_page",
+    "restore_original_code"
+  ],
+  "local_tests": {
+    "total": 361,
+    "skipped": 22,
+    "failures": 0
+  },
+  "browser_checks": [
+    "global_column_choices",
+    "live_search_preserves_columns",
+    "numeric_range",
+    "matching_excel",
+    "mobile_dialog",
+    "signed_preview_shortcut",
+    "partial_substitution_reservation_only",
+    "customer_history_link",
+    "browser_pdf",
+    "existing_shared_inbound_and_print_queue",
+    "existing_inbound_copy_excel_print",
+    "existing_stocktake_and_production"
+  ],
+  "company_printer_real_hardware_tested": false,
+  "vpn_home_client_tested": false,
+  "printing_default_enabled": false,
+  "production_server_installed": false,
+  "private_data_included": false
+}
