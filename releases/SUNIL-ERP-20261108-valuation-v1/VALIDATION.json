@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "windows_native_success": true,
+  "windows_schedule_restore_success": true,
+  "postgresql18_success": true,
+  "browser_success": true,
+  "commit": "c66be35aa19b4802562d2fdfece57a61061607c7",
+  "workflow_url": "https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/actions/runs/42491358256",
+  "erp_tests_url": "https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/actions/runs/42491358304",
+  "job_ids": {
+    "browser": 128764232495,
+    "windows-python312": 128764232815,
+    "postgresql18": 128764232880
+  },
+  "public_app_files": 142,
+  "helper_files": 4,
+  "unique_source_files_matched": 144,
+  "third_party_bundle": "SheetJS 0.20.3 pinned integrity verified",
+  "compatibility_versions": 9,
+  "local_tests": {
+    "total": 365,
+    "skipped": 22,
+    "failures": 0
+  },
+  "new_manual_in_public_distribution": false,
+  "company_printer_real_hardware_tested": false,
+  "vpn_home_client_tested": false,
+  "production_server_installed": false,
+  "private_data_included": false
+}
