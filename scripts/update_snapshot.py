@@ -30,6 +30,7 @@ with warehouse_lock():
         count=0
         for row in model.objects.order_by('pk').values().iterator(chunk_size=1000):
             # Additive permission defaults must hash equally before/after schema upgrade.
+            if model._meta.model_name=='reconciliationrow':row.setdefault('inventory_amount',None)
             if model._meta.model_name=='employeemenuaccess':row.setdefault('inbound_record',False)
             digest.update(json.dumps(row,cls=SnapshotEncoder,sort_keys=True,separators=(',',':')).encode())
             digest.update(b'\n')

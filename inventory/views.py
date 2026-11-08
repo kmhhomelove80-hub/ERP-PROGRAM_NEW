@@ -52,6 +52,8 @@ def stock_list(request):
                              'url': '?' + sort_params.urlencode()})
     totals = stocks.aggregate(quantity=Sum('quantity'),reserved=Sum('reserved'))
     totals['available'] = (totals['quantity'] or 0) - (totals['reserved'] or 0)
+    from .valuation import summarize, stock_value
+    valuation, reference, erp_snapshot = summarize(stocks)
     from .models import Item
     scan_item_exists = bool(scan_mode and Item.objects.filter(code__iexact=query).exists())
     page=Paginator(stocks,50).get_page(request.GET.get('page'))
@@ -61,10 +63,10 @@ def stock_list(request):
     prefetch_related_objects(page.object_list, Prefetch('allocation_set', queryset=Allocation.objects.filter(state='reserved').order_by('project', 'pk'), to_attr='active_allocations'))
     for stock in page.object_list:
         stock.hull_summary = ' / '.join(f'{row.project} ({row.quantity})' for row in stock.active_allocations)
-    from .reconciliation import latest_reference
-    reference,erp_snapshot=latest_reference('Y09',[s.item.code for s in page.object_list])
-    for stock in page.object_list:stock.erp_pending=reference.get(stock.item.code,{}).get('shipping_pending')
-    return render(request,'inventory/stock_results.html' if request.GET.get('partial')=='1' else 'inventory/stock_list.html',{'page_obj':page, 'query':query,'status':status,'totals':totals,'statuses':Stock.Status.choices,'erp_snapshot':erp_snapshot,'sort':sort,'direction':direction,'sort_headers':sort_headers,'scan_mode':scan_mode,'scan_item_exists':scan_item_exists,'model_query':filters['model'],'spec_query':filters['spec'], 'stock_column_filters':parse_stock_columns(request.GET), 'stock_querystring':stock_params.urlencode()})
+    for stock in page.object_list:
+        stock.erp_pending=reference.get(stock.item.code,{}).get('shipping_pending')
+        stock.estimated_amount, stock.amount_note = stock_value(stock, reference)
+    return render(request,'inventory/stock_results.html' if request.GET.get('partial')=='1' else 'inventory/stock_list.html',{'page_obj':page, 'query':query,'status':status,'totals':totals,'statuses':Stock.Status.choices,'erp_snapshot':erp_snapshot,'sort':sort,'direction':direction,'sort_headers':sort_headers,'scan_mode':scan_mode,'scan_item_exists':scan_item_exists,'model_query':filters['model'],'spec_query':filters['spec'], 'valuation':valuation, 'stock_column_filters':parse_stock_columns(request.GET), 'stock_querystring':stock_params.urlencode()})
 
 @menu_access('receiving')
 def receipt_create(request):
@@ -343,7 +345,7 @@ def erp_upload(request):
             preview=[]
             for warehouse in ['Y09','Y02']:
                 rows=[r for r in plan['rows'] if r['warehouse']==warehouse]
-                if rows:preview.append(dict(warehouse=warehouse,rows=len(rows),quantity=sum(r['quantity'] for r in rows),pending=sum(r['shipping_pending'] for r in rows),negative=sum(r['quantity']<0 or r['shipping_pending']<0 for r in rows)))
+                if rows:preview.append(dict(warehouse=warehouse,rows=len(rows),quantity=sum(r['quantity'] for r in rows),pending=sum(r['shipping_pending'] for r in rows),amount_rows=sum(r.get('inventory_amount') is not None for r in rows),negative=sum(r['quantity']<0 or r['shipping_pending']<0 for r in rows)))
             payload=dict(actor=request.user.pk,request_id=str(d['request_id']),label=d['label'],erp_as_of=d['erp_as_of'].isoformat(),plan=plan)
             token=signing.dumps(payload,salt='erp-preview',compress=True)
             confirm_form=ErpConfirmForm(initial={'preview_token':token})
@@ -493,7 +495,8 @@ def stock_export(request):
     with warehouse_lock():
         if rows.count()>MAX_EXPORT_ROWS:return HttpResponse('검색 범위를 좁혀주세요. 내보내기 행 수 제한을 초과했습니다.',status=400)
         reference,snapshot=latest_reference('Y09',list(rows.values_list('item__code',flat=True)))
-        data=workbook_bytes('재고조회',['ERP 코드','모델명','사양','창고','위치','입고 상태','현재고','allocated','가용량','품목 전체 출하대기','예정일','담당자'],([s.item.code,s.legacy_name or s.item.name,s.legacy_specification or s.item.specification,s.warehouse,s.location,s.get_status_display(),s.quantity,s.reserved,s.available,reference.get(s.item.code,{}).get('shipping_pending'),s.expected_date,s.sender] for s in rows.iterator(chunk_size=1000)))
+        from .valuation import stock_value
+        data=workbook_bytes('재고조회',['ERP 코드','모델명','사양','창고','위치','입고 상태','현재고','allocated','가용량','품목 전체 출하대기','예정일','담당자','재고금액(ERP 기준 추정·원)','금액 계산 상태','ERP 금액 기준 시각'],([s.item.code,s.legacy_name or s.item.name,s.legacy_specification or s.item.specification,s.warehouse,s.location,s.get_status_display(),s.quantity,s.reserved,s.available,reference.get(s.item.code,{}).get('shipping_pending'),s.expected_date,s.sender,stock_value(s,reference)[0],stock_value(s,reference)[1],timezone.localtime(snapshot.erp_as_of).strftime('%Y-%m-%d %H:%M') if snapshot else None] for s in rows.iterator(chunk_size=1000)))
     response=HttpResponse(data,content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition']=f'attachment; filename="stock_{timezone.localtime():%Y%m%d_%H%M}.xlsx"'
     return response
@@ -516,7 +519,7 @@ def erp_export(request,pk):
         if rows.count()>MAX_EXPORT_ROWS:return HttpResponse('검색 범위를 좁혀주세요. 내보내기 행 수 제한을 초과했습니다.',status=400)
         from .substitutions import snapshot_summaries
         loan_summary=snapshot_summaries(snapshot,list(rows.values_list('code',flat=True))) if warehouse=='Y09' else {}
-        data=workbook_bytes('ERP대조',['창고','ERP 코드','모델명','ERP 현재고','도착분','예정분','관리 합계','차이(관리-ERP)','allocated','출하대기','확인 상태','원인','조치','ERP 기준시각(한국)','비교시각(한국)','관련 대체 출고 건수','기준시각 미상환 수량'],([r.warehouse,r.code,r.name,r.erp_quantity,r.received if warehouse=='Y09' else None,r.expected if warehouse=='Y09' else None,r.managed if warehouse=='Y09' else None,r.difference,r.reserved if warehouse=='Y09' else None,r.shipping_pending,r.get_review_state_display() if r.needs_review else '',r.reason,r.action_note,timezone.localtime(snapshot.erp_as_of).strftime('%Y-%m-%d %H:%M'),timezone.localtime(snapshot.created_at).strftime('%Y-%m-%d %H:%M'),loan_summary.get(r.code,{}).get('count',0),loan_summary.get(r.code,{}).get('outstanding',0)] for r in rows.iterator(chunk_size=1000)))
+        data=workbook_bytes('ERP대조',['창고','ERP 코드','모델명','ERP 현재고','도착분','예정분','관리 합계','차이(관리-ERP)','allocated','출하대기','확인 상태','원인','조치','ERP 기준시각(한국)','비교시각(한국)','관련 대체 출고 건수','기준시각 미상환 수량','ERP 재고금액 원본'],([r.warehouse,r.code,r.name,r.erp_quantity,r.received if warehouse=='Y09' else None,r.expected if warehouse=='Y09' else None,r.managed if warehouse=='Y09' else None,r.difference,r.reserved if warehouse=='Y09' else None,r.shipping_pending,r.get_review_state_display() if r.needs_review else '',r.reason,r.action_note,timezone.localtime(snapshot.erp_as_of).strftime('%Y-%m-%d %H:%M'),timezone.localtime(snapshot.created_at).strftime('%Y-%m-%d %H:%M'),loan_summary.get(r.code,{}).get('count',0),loan_summary.get(r.code,{}).get('outstanding',0),r.inventory_amount] for r in rows.iterator(chunk_size=1000)))
     response=HttpResponse(data,content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition']=f'attachment; filename="erp_comparison_{warehouse}.xlsx"'
     return response

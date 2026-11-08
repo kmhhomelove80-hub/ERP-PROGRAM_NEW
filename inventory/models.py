@@ -129,6 +129,7 @@ class ReconciliationRow(models.Model):
     name = models.CharField(max_length=250, blank=True)
     erp_quantity = models.IntegerField(null=True)
     shipping_pending = models.IntegerField(null=True)
+    inventory_amount = models.DecimalField(max_digits=24, decimal_places=4, null=True, blank=True)
     received = models.PositiveIntegerField(default=0)
     expected = models.PositiveIntegerField(default=0)
     reserved = models.PositiveIntegerField(default=0)
