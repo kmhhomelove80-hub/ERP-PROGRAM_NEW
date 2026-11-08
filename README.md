@@ -1,6 +1,17 @@
 # SUNIL 창고 관리
 
-## 최신 통합 업데이트 · 2026-11-07
+## 최신 프로그램 업데이트 · 2026-11-08
+
+**SUNIL-ERP-20261108-valuation-v1** — Y09 ERP 재고금액 저장·위치별 추정 금액·필터 합계·엑셀 개선.
+
+- [프로그램 ZIP 다운로드](https://raw.githubusercontent.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/f81889b744a783177953352d2d95d4a468997a39/releases/SUNIL-ERP-20261108-valuation-v1/SUNIL-ERP-20261108-valuation-v1.zip)
+- [변경 내용](https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/blob/f81889b744a783177953352d2d95d4a468997a39/releases/SUNIL-ERP-20261108-valuation-v1/README.md) · [진도표](https://github.com/kmhhomelove80-hub/ERP-PROGRAM_NEW/blob/f81889b744a783177953352d2d95d4a468997a39/releases/SUNIL-ERP-20261108-valuation-v1/progress.md)
+- Windows·PostgreSQL·브라우저 검사 통과. 금액 표시에는 금액이 포함된 Y09 자료 재등록이 필요합니다.
+- 새 사용 설명서는 공개하지 않으며, 이 공개 ZIP에도 포함하지 않았습니다.
+
+
+
+## 이전 통합 업데이트 · 2026-11-07
 
 **SUNIL-ERP-20261107-final-v1** — 위치별 재고 머리글 필터·피킹 주문 이력 바로가기·부족표 대체품 등록. 입고 LIST 누적/공동 작업과 회사 서버 프린터를 포함합니다.
 
